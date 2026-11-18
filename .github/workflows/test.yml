@@ -12,6 +12,8 @@ permissions:
 jobs:
   smoke:
     strategy:
+      # Every system reports its own result: one failure does not cancel the other five.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node: [18, 22]

@@ -18,10 +18,11 @@ const sealFor = (s, id) => crypto.createHmac('sha256', fs.readFileSync(path.join
 function sandbox() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'driftless-test-'));
   // The bench's own terminal is not the case's: a case that needs one says so (TERM), or it would pass in a terminal
-  // and fail in a container, where there is none. Nor is the shell's NoDefaultCurrentDirectoryInExePath (Claude Code
+  // and fail in a container, where there is none. Nor is the bench's CI job (CI, GITHUB_ACTIONS: Gemini CLI reads both as
+  // "nobody at the keyboard"), nor the shell's NoDefaultCurrentDirectoryInExePath (Claude Code
   // sets it for its own commands): with it, cmd.exe does not run a program from the current folder, as it otherwise does.
   const env = {
-    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(CLAUDE|DRIFTLESS_|VSCODE_|ELECTRON_RUN_AS_NODE$|CI$|TERM$|TERM_PROGRAM$|TERM_SESSION_ID$|WT_SESSION$|SSH_TTY$|TMUX$|ConEmuPID$|NoDefaultCurrentDirectoryInExePath$)/i.test(k))),
+    ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(CLAUDE|DRIFTLESS_|VSCODE_|ELECTRON_RUN_AS_NODE$|CI$|GITHUB_ACTIONS$|TERM$|TERM_PROGRAM$|TERM_SESSION_ID$|WT_SESSION$|SSH_TTY$|TMUX$|ConEmuPID$|NoDefaultCurrentDirectoryInExePath$)/i.test(k))),
     HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: path.join(home, 'claude-config'),
     CLAUDE_PID: String(process.pid), DRIFTLESS_DRY_OPEN: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', // Claude Code in a terminal
   };

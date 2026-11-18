@@ -4,6 +4,9 @@
 - **The tests run on every push and pull request.** The repository is public, so GitHub Actions minutes are free:
   `.github/workflows/test.yml` goes back to `push` and `pull_request` (six jobs: Linux, macOS and Windows, Node 18
   and 22), and can still be started by hand. The job token stays read-only.
+- **The tests no longer take the CI job for the user's.** On GitHub Actions three Gemini CLI cases failed: the bench passed
+  `GITHUB_ACTIONS=true` on to the hook, which Gemini CLI reads as "nobody at the keyboard". The bench now leaves it out, as it
+  already did with `CI`, and one failing system no longer cancels the other five (`fail-fast: false`).
 - **The page looks half a coder's screen, half a sea chart.** `docs/index.html` now has a pale sea-chart theme by day
   and a night-sea theme by lantern light, with an amphitheatre at night on the horizon (`docs/arena-light.webp` and
   `docs/arena-dark.webp`, 12 and 16 KB, blurred and blended in only as far as every text colour keeps 4.5:1 on every
