@@ -1,0 +1,30 @@
+{
+  "name": "driftless",
+  "version": "0.1.0",
+  "description": "Hands off before context rot: a goal that never drifts, a living design doc, a self-compressing logbook, and an automatic handoff that resumes in a fresh session.",
+  "author": {
+    "name": "Driftless contributors"
+  },
+  "license": "MIT",
+  "userConfig": {
+    "token_cap": {
+      "type": "number",
+      "title": "Context cap (tokens)",
+      "description": "Optional. Leave empty and Driftless hands off when a fresh start costs less than carrying on. Set it to hand off at this many tokens instead; with a percentage too, the lower wins.",
+      "min": 50000,
+      "max": 1000000
+    },
+    "cap_percent": {
+      "type": "number",
+      "title": "Context cap (% of the window)",
+      "description": "Optional. Hand off at this percentage of the context window instead (e.g. 34). The window is inferred from the model; set context_window in .driftless/config.json to force it.",
+      "min": 5,
+      "max": 95
+    },
+    "projects_root": {
+      "type": "directory",
+      "title": "Projects folder",
+      "description": "Where new Driftless projects are created."
+    }
+  }
+}

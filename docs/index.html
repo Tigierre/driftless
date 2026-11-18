@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driftless: hand off before the context rots</title>
+<meta name="description" content="Hand off before the context rots, and never drift from what you set out to do. For Claude Code, Codex, Cursor, OpenCode, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin, Kiro and any agent that reads AGENTS.md.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#ebf6f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b191d" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Driftless: hand off before the context rots">
+<meta property="og:description" content="When carrying a session's context costs more than a fresh start, Driftless writes down where things stand and reopens the project in a fresh session by itself. 27% to 31% off the whole bill on the author's own history. No server, no account, MIT.">
+<meta property="og:image" content="https://tigierre.github.io/driftless/social.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  /* Half a coder's screen, half a sea chart: graph paper that is also a map grid, monospace for the machinery,
+     an old-world serif for the headings, a pale chart by day, a night sea by lantern light, and an amphitheatre
+     on the horizon. Every text colour holds 4.5:1 against the background, the horizon picture included. */
+  :root {
+    --bg: #ebf6f6; --fg: #152428; --muted: #435a5e; --line: #c5d9d9; --card: #f8fdfd;
+    --accent: #0d625d; --accent-soft: #e5f1f0; --code: #deeded;
+    --gold: #b5832a; --treasure: #82510a; --red: #ac1b6e;
+    --grid: rgba(13, 98, 93, .07); --vignette: transparent;
+    --horizon: url(arena-light.webp);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --mono: ui-monospace, "Cascadia Code", "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b191d; --fg: #deebea; --muted: #a5b9ba; --line: #22393d; --card: #0f2227;
+      --accent: #84cec4; --accent-soft: #10292e; --code: #12292f;
+      --gold: #d6a648; --treasure: #e4b75a; --red: #ed83b4;
+      --grid: rgba(132, 206, 196, .05); --vignette: rgba(0, 0, 0, .5);
+      --horizon: url(arena-dark.webp);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b191d; --fg: #deebea; --muted: #a5b9ba; --line: #22393d; --card: #0f2227;
+    --accent: #84cec4; --accent-soft: #10292e; --code: #12292f;
+    --gold: #d6a648; --treasure: #e4b75a; --red: #ed83b4;
+    --grid: rgba(132, 206, 196, .05); --vignette: rgba(0, 0, 0, .5);
+    --horizon: url(arena-dark.webp);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; overflow-x: hidden; color: var(--fg); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 50% 35%, transparent 55%, var(--vignette)),
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+    background-attachment: fixed, scroll, scroll;
+  }
+  /* The horizon: an amphitheatre at night, blurred and blended into the sea, fixed at the bottom of the window. */
+  body::before { content: ""; position: fixed; z-index: -1; left: 0; right: 0; bottom: 0; height: min(50vw, 75vh);
+    background: var(--horizon) center bottom / cover no-repeat; pointer-events: none; }
+  ::selection { background: var(--gold); color: #1a120a; }
+  main { position: relative; z-index: 0; max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-family: var(--serif); font-size: 2.9rem; line-height: 1.08; margin: 0 0 14px; letter-spacing: -0.01em; }
+  h2 { font-family: var(--serif); font-size: 1.6rem; line-height: 1.2; margin: 60px 0 14px; }
+  /* Under each heading a short length of rope. */
+  h2::after { content: ""; display: block; width: 84px; height: 5px; margin-top: 9px; border-radius: 3px;
+    background: repeating-linear-gradient(-55deg, var(--gold) 0 3px, transparent 3px 6px); }
+  /* Above it, the section's line in the ship's log, written the way a coder writes a comment. */
+  .kicker { margin: 64px 0 4px; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.05em; color: var(--accent); }
+  .kicker + h2, .kicker + h1 { margin-top: 0; }
+  .hero-k { margin-top: 0; }
+  p, li { color: var(--fg); }
+  .lead { font-size: 1.25rem; color: var(--muted); margin: 0 0 28px; }
+  .muted { color: var(--muted); }
+  code, pre { font-family: var(--mono); font-size: 0.9em; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-left: 3px solid var(--gold); padding: 14px 16px; border-radius: 6px; overflow-x: auto; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  /* The haul: each figure on a card with a brass edge. */
+  .numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 20px 0; }
+  .num { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--gold); border-radius: 8px; padding: 16px; }
+  .num b { display: block; font-family: var(--serif); font-size: 2rem; color: var(--treasure); line-height: 1.1; }
+  .num span { color: var(--muted); font-size: 0.92rem; }
+  .docs { display: grid; gap: 10px; margin: 16px 0; }
+  .doc { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; }
+  .doc code { background: transparent; padding: 0; font-weight: 600; color: var(--accent); }
+  ol li { margin-bottom: 8px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 0.93rem; background: var(--card); }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); background: var(--code); }
+  tr:last-child td { border-bottom: none; }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:hover, a:focus-visible { color: var(--treasure); }
+  footer { margin-top: 64px; padding-top: 18px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 0.9rem; }
+  footer .anchor { color: var(--gold); margin-right: 6px; }
+  /* Top bar: the mark, the name, where to go; then the sea. */
+  .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 700; font-size: 1.3rem; color: var(--fg); text-decoration: none; margin-right: auto; }
+  .brand img { width: 34px; height: 34px; display: block; }
+  .top nav { display: flex; gap: 18px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.85rem; }
+  .top nav a { color: var(--muted); text-decoration: none; }
+  .top nav a:hover, .top nav a:focus-visible { color: var(--accent); text-decoration: underline; }
+  .wave { display: block; width: 100%; height: 14px; margin: 18px 0 40px; color: var(--accent); opacity: 0.55; }
+  .wave path { fill: none; stroke: currentColor; stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+  /* A compass rose drawn faintly on the chart, behind the opening lines. */
+  .rose { position: absolute; z-index: -1; top: 96px; right: -56px; width: 280px; height: 280px; color: var(--accent); opacity: 0.08; transform: rotate(12deg); pointer-events: none; }
+  /* The loop, as five steps of a route on the map, the X where it lands: side by side where there is room, one under
+     the other on a phone. */
+  .chain { list-style: none; padding: 0; margin: 28px 0 8px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; counter-reset: step; }
+  .chain li { position: relative; margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 12px 14px; counter-increment: step; }
+  .chain li::before { content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--gold); color: var(--treasure); font-family: var(--mono); font-size: 0.8rem; font-weight: 700; margin-bottom: 8px; }
+  .chain li:not(:last-child)::after { content: ""; position: absolute; right: -19px; top: 50%; width: 18px; border-top: 2px dashed var(--red); }
+  .chain li:last-child { border-color: var(--red); }
+  .chain li:last-child::after { content: "\2715" / ""; position: absolute; top: 8px; right: 11px; color: var(--red); font-weight: 800; font-size: 1.15rem; line-height: 1; }
+  .chain b { display: block; font-family: var(--mono); font-size: 0.95rem; line-height: 1.25; }
+  .chain span { display: block; color: var(--muted); font-size: 0.86rem; line-height: 1.35; margin-top: 4px; }
+  .loop { color: var(--muted); font-size: 0.92rem; margin: 0 0 28px; }
+  @media (max-width: 700px) {
+    /* The rose still peeks in from the edge, cut by it: the page no longer slides sideways. */
+    main { overflow-x: clip; }
+    h1 { font-size: 2.3rem; }
+    .rose { width: 190px; height: 190px; top: 70px; right: -60px; }
+    .chain { grid-template-columns: 1fr; gap: 22px; }
+    .chain li:not(:last-child)::after { right: auto; left: 24px; top: 100%; width: 0; height: 22px; border-top: none; border-left: 2px dashed var(--red); }
+  }
+  /* The status line as the terminal shows it: a coder's screen, lit like a lantern. */
+  .term { background: #0a1416; border: 1px solid #1d3236; border-radius: 8px; margin: 16px 0 6px; overflow: hidden; }
+  .term-bar { display: flex; gap: 6px; padding: 9px 12px; border-bottom: 1px solid #1d3236; }
+  .term-bar i { width: 10px; height: 10px; border-radius: 50%; background: #e07a5f; }
+  .term-bar i:nth-child(2) { background: #d6a648; }
+  .term-bar i:nth-child(3) { background: #52cfc2; }
+  .term pre { margin: 0; background: none; border: none; color: #eee3c9; border-radius: 0; }
+  .term .dim { color: #7f938f; }
+  .term .hi { color: #52cfc2; }
+  .caption { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="#top"><img src="icon.svg" alt="" width="34" height="34">Driftless</a>
+    <nav aria-label="On this page">
+      <a href="#measured">What it saves</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/Tigierre/driftless">GitHub</a>
+    </nav>
+  </header>
+  <svg class="wave" viewBox="0 0 760 14" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M0 7 Q11.875 1 23.75 7 T47.5 7 T71.25 7 T95 7 T118.75 7 T142.5 7 T166.25 7 T190 7 T213.75 7 T237.5 7 T261.25 7 T285 7 T308.75 7 T332.5 7 T356.25 7 T380 7 T403.75 7 T427.5 7 T451.25 7 T475 7 T498.75 7 T522.5 7 T546.25 7 T570 7 T593.75 7 T617.5 7 T641.25 7 T665 7 T688.75 7 T712.5 7 T736.25 7 T760 7"/></svg>
+  <svg class="rose" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width=".5"/>
+    <circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width=".9" stroke-dasharray="1.2 1.6"/>
+    <path d="M32 14 34.6 29.4 50 32 34.6 34.6 32 50 29.4 34.6 14 32 29.4 29.4Z" transform="rotate(45 32 32)" fill="currentColor" opacity=".55"/>
+    <path d="M32 2 37.5 26.5 62 32 37.5 37.5 32 62 26.5 37.5 2 32 26.5 26.5Z" fill="currentColor"/>
+  </svg>
+
+  <p class="kicker hero-k" aria-hidden="true">// captain's log</p>
+  <h1 id="top">Hand off before the context rots.</h1>
+  <p class="lead">And never drift from what you set out to do.
+  For Claude Code, Codex, Cursor, OpenCode, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin and Kiro, and, without the automation, for any agent
+  that reads <code>AGENTS.md</code> (only Claude Code is tried live: <a href="#help-wanted">help wanted</a>).</p>
+  <p><b>27% to 31% off the whole bill, subagents included</b>, replayed on the author's own month of work against carrying each
+  piece of work in one session to the end. Every comparison, the weak ones too, is <a href="#measured">below</a>.</p>
+
+  <ol class="chain" aria-label="What Driftless does by itself, in five steps">
+    <li><b>Watch</b><span>the size of the context, at every answer</span></li>
+    <li><b>Hand off</b><span>when carrying it costs more than a fresh start</span></li>
+    <li><b>Write down</b><span>where things stand, in three documents</span></li>
+    <li><b>Reopen</b><span>the project in a fresh session</span></li>
+    <li><b>Resume</b><span>from the resume point, and go on</span></li>
+  </ol>
+  <p class="loop">Then round again. You type nothing, and you never look at a context meter.</p>
+
+  <p>Long agent sessions get more expensive as they grow. Every answer re-reads the whole context, so a
+  session that never ends pays more and more for each step. Many people also find they get worse; our own data
+  neither confirm nor refute that. Compaction squeezes the history and loses details nobody chose to lose.</p>
+  <p>Driftless does what careful people do by hand: before the context grows stale, it writes down where
+  things stand and starts a fresh session that picks up from there.</p>
+  <div class="term" role="img" aria-label="The status line: Driftless, context 142k of 260k (55%), cache 37 minutes, saved 67.82 dollars">
+    <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+    <pre><code><span class="hi">Driftless</span> <span class="dim">·</span> ctx 142k/260k (55%) <span class="dim">·</span> cache 37m <span class="dim">·</span> <span class="hi">saved $67.82</span></code></pre>
+  </div>
+  <p class="caption">All there is to see while you work: the context against the handoff limit, the minutes left on the prompt cache, the saving so far.</p>
+
+  <p class="kicker" aria-hidden="true">// 01 · the haul, counted</p>
+  <h2 id="measured">Measured, not promised</h2>
+  <p class="muted">One developer's real history (97 pieces of work, October to November 2026, Opus 5.5 on a 1M-token window),
+  replayed at November's list prices against <b>never resetting</b>: each piece of work carried in one session until it is done,
+  with no handoff, no <code>/clear</code> and no compaction. On a 200k window native compaction would step in first, so your
+  "before" may cost less than this one.</p>
+  <div class="numbers">
+    <div class="num"><b>−27 to −31%</b><span>the whole bill, subagents included, with everything built today (replayed)</span></div>
+    <div class="num"><b>−30%</b><span>the main thread, the rule alone (95% interval: 18% to 44%)</span></div>
+    <div class="num"><b>about −22%</b><span>the fixed cost of every fresh session, with nothing of yours hidden (estimated, measured once)</span></div>
+  </div>
+  <p class="muted">The fixed cost is what a session weighs before you type: in Claude Code, VS Code panel, 77.7k tokens → about 60.3k
+  estimated, 59.0k measured once, automatically, with none of your agents, skills or instructions hidden.
+  Read each of the other figures against what it compares:</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Against</th><th>What</th><th>Saving</th></tr></thead>
+    <tbody>
+      <tr><td>never resetting</td><td>everything built today: rule, size guards, diet, command output limit (replayed, with the handoff priced as 17 real handoffs cost and the re-reads after a cut output counted; the lighter start estimated, quality not measured)</td><td><b>27.0% to 31.3% of the whole bill</b> (29.5% in the middle)</td></tr>
+      <tr><td>never resetting</td><td>the rule alone, main thread (97 pieces of work)</td><td>30.1% (95% interval 18.2% to 43.6%)</td></tr>
+      <tr><td>never resetting</td><td>the rule alone, whole bill with subagents</td><td>19.3%</td></tr>
+      <tr><td>the same developer's careful manual handoffs</td><td>the rule, main thread</td><td>3.5%: the value is not having to watch a meter</td></tr>
+      <tr><td>short work, under 100 requests</td><td>the rule</td><td>about 0%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">Ten long pieces of work out of 73 make 85% of the saving, so with little history your figure can land anywhere
+  from near zero to a third.</p>
+  <p class="muted">These are one person's numbers. Yours are one question away: ask the agent "does Driftless pay off here?" and
+  <code>audit</code> replays your own history on your machine, spends no tokens, sends nothing, and says so when Driftless would not save you money. The saving depends
+  on the price list: as cache reads get cheaper, resetting saves less money. Quality against context rot is not measured here.</p>
+
+  <p class="kicker" aria-hidden="true">// 02 · charts aboard</p>
+  <h2>Three documents, three jobs</h2>
+  <div class="docs">
+    <div class="doc"><code>NORTHSTAR.md</code> — the goal, in your words: why you want it, how you will know, what you do not want. Only you change it.</div>
+    <div class="doc"><code>DESIGN.md</code> — the durable source of truth, by topic, kept as-is, with an index at the top. Sessions read only the sections they need.</div>
+    <div class="doc"><code>LOGBOOK.md</code> — the last three tasks in detail, older ones one line each, and the <b>Resume point</b>.</div>
+  </div>
+
+  <p class="kicker" aria-hidden="true">// 03 · the voyage</p>
+  <h2 id="how">How it works</h2>
+  <ol>
+    <li><b>Start.</b> In a folder that is not a project, Driftless asks: new project, resume one, or just work here. A new project gets its folder, the three documents and a short interview for the North Star.</li>
+    <li><b>Work.</b> Every session starts with the goal, the resume point and the design index already in context.</li>
+    <li><b>Time to hand off.</b> When carrying the context has cost as much as a fresh start, or at a cap you set, the agent is asked to hand off: durable decisions go to the design doc, the logbook is compressed, the resume point is rewritten with a course check against the North Star.</li>
+    <li><b>Fresh session.</b> Driftless opens a fresh session in the project whose first prompt is "resume from the resume point". The old one stops.</li>
+    <li><b>One driver.</b> A baton keeps two live sessions from steering the same project. In Claude Code it goes to the session you write in, not to the one that opened first.</li>
+  </ol>
+
+  <p class="kicker" aria-hidden="true">// 04 · come aboard</p>
+  <h2 id="install">Install</h2>
+  <p>What you get depends on what the tool lets Driftless hang on to.</p>
+  <ul>
+    <li><b>Level 1, hooks.</b> The tool runs Driftless when a session starts and when a turn ends: the session starts with the
+    project's context, the size of the context is watched, the handoff is asked for by itself, and the fresh session opens by
+    itself wherever the tool can open one. Where the hooks do not say the size of the context (Devin, Kiro), the handoff is asked
+    for at the end of each step of the resume point instead.</li>
+    <li><b>Level 2, no hooks.</b> The method without the automation: the agent runs two commands because <code>AGENTS.md</code>
+    tells it to. Nothing measures the context, and you start the next session.</li>
+  </ul>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Tool</th><th>Level</th><th>Context measured</th><th>Fresh session</th><th>One-time step</th><th>Tried live</th></tr></thead>
+    <tbody>
+      <tr><td>Claude Code</td><td>1</td><td>real tokens</td><td>where you work: VS Code panel, desktop app or terminal; none after a one-shot <code>claude -p</code>, which is asked nothing</td><td>trust the projects folder</td><td><b>yes</b>: on Windows, at every change</td></tr>
+      <tr><td>Codex</td><td>1</td><td>real tokens</td><td>new terminal window; none after a one-prompt <code>codex exec</code>, which is asked nothing</td><td>approve the hooks once (<code>/hooks</code>)</td><td>no</td></tr>
+      <tr><td>Cursor</td><td>1</td><td>estimated</td><td>new terminal window (Cursor CLI); none after a one-prompt <code>agent -p</code></td><td>install the Cursor CLI and log in, reload Cursor</td><td>no</td></tr>
+      <tr><td>OpenCode</td><td>1</td><td>real tokens</td><td>same window in its terminal UI; under <code>serve</code> or <code>web</code>, in the session list; none after a one-shot <code>run</code></td><td>none</td><td>once, before the economic rule</td></tr>
+      <tr><td>Kilo Code</td><td>1</td><td>real tokens</td><td>same window in its terminal UI; inside VS Code, a JetBrains IDE or under <code>kilo serve</code>, in the session list; none after a one-shot <code>kilo run</code></td><td>restart Kilo once</td><td>no</td></tr>
+      <tr><td>Amp</td><td>1</td><td>real tokens</td><td>new thread, same client; none after a one-prompt <code>amp -x</code></td><td>reload the plugins once (<code>plugins: reload</code>)</td><td>no</td></tr>
+      <tr><td>Qwen Code</td><td>1</td><td>real tokens</td><td>from a terminal: <code>qwen -i</code>; none after a one-prompt <code>qwen -p</code></td><td>none: hooks are on by default, only a project's own ask for approval</td><td>no</td></tr>
+      <tr><td>Gemini CLI</td><td>1</td><td>real tokens</td><td>from a terminal: <code>gemini -i</code>; none after a one-prompt <code>gemini -p</code></td><td>trust the folder: it runs hooks only in one it trusts</td><td>no</td></tr>
+      <tr><td>Copilot CLI</td><td>1</td><td>estimated</td><td>from a terminal: <code>copilot -i</code>; none after a one-prompt <code>copilot -p</code></td><td>none: only a repository's hooks need admission</td><td>no</td></tr>
+      <tr><td>Devin</td><td>1</td><td>no: asked at the end of each step</td><td>from a terminal: <code>devin --</code>; none after a one-prompt <code>devin -p</code></td><td>trust the folder when Devin asks</td><td>no</td></tr>
+      <tr><td>Kiro</td><td>1</td><td>no: asked at the end of each step</td><td>from a terminal: <code>kiro-cli chat</code>; from the IDE: no, you start it; none after a headless <code>--no-interactive</code> run</td><td>for the IDE, install it in each project</td><td>no</td></tr>
+      <tr><td>Any other agent that reads <code>AGENTS.md</code></td><td>2</td><td>no</td><td>no: you start it</td><td>install it in each project</td><td>no</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">"No" means written from the tool's own documentation and run in the tests on input in the documented shape,
+  never in the tool itself. The author works on Claude Code only, on Windows: macOS has never been tried, Linux only in a
+  container without a model, and the CI workflow has not run yet.</p>
+  <p>Claude Code, as a plugin:</p>
+  <pre><code>/plugin marketplace add Tigierre/driftless
+/plugin install driftless@driftless</code></pre>
+  <p>The other tools of level 1: clone the repository (Node.js 18+), then once per tool (<code>&lt;clone&gt;</code> is the folder
+  you cloned it into; keep it, the hooks run from there):</p>
+  <pre><code>node &lt;clone&gt;/scripts/driftless.mjs install codex
+node &lt;clone&gt;/scripts/driftless.mjs install cursor
+node &lt;clone&gt;/scripts/driftless.mjs install opencode
+node &lt;clone&gt;/scripts/driftless.mjs install amp
+node &lt;clone&gt;/scripts/driftless.mjs install qwen
+node &lt;clone&gt;/scripts/driftless.mjs install gemini
+node &lt;clone&gt;/scripts/driftless.mjs install copilot
+node &lt;clone&gt;/scripts/driftless.mjs install devin
+node &lt;clone&gt;/scripts/driftless.mjs install kiro
+node &lt;clone&gt;/scripts/driftless.mjs install kiro &lt;project folder&gt;   # the Kiro IDE reads hooks from the project</code></pre>
+  <p>Codex skips without a word a hook you have not approved, so an install can look done and do nothing:
+  <code>node &lt;clone&gt;/scripts/driftless.mjs doctor codex</code> asks Codex itself and says, hook by hook, whether it runs.
+  Driftless only asks: it never writes the approval for you. The approval holds for <code>codex exec</code> too:
+  your scripts run the hooks you approved in a session, and skip the others just as silently.</p>
+  <p>OpenCode, Kilo Code and Amp load a plugin and have no command that says whether they call it. The plugin writes down
+  what it is told (loaded, a session started, a turn ended and with what size of context), and
+  <code>node &lt;clone&gt;/scripts/driftless.mjs doctor opencode</code> (or <code>kilo</code>, or <code>amp</code>) reads it back: what has
+  come since the install, and what to do about what has not. Cursor, Qwen Code, Gemini CLI, Copilot CLI, Devin and Kiro run
+  hooks that are commands, and have no command that says whether they run them: each hook notes that it ran, and
+  <code>doctor cursor</code> (or <code>qwen</code>, <code>gemini</code>, <code>copilot</code>, <code>devin</code>,
+  <code>kiro</code>) says which has run since the install. Those notes hold no folder, no session and nothing of the
+  conversation.</p>
+  <p>Level 2, once per project:</p>
+  <pre><code>node &lt;clone&gt;/scripts/driftless.mjs install generic &lt;project folder&gt;</code></pre>
+  <p>It makes the folder a Driftless project and writes an <code>AGENTS.md</code> there that tells the agent to run
+  <code>begin</code> when a session starts (the goal, the resume point, the design index) and <code>step</code> when a step of
+  the resume point is done (it asks for the handoff). An <code>AGENTS.md</code> you already have is written to only if you ask:
+  Driftless shows the lines and you add them, or <code>install generic &lt;project folder&gt; --append</code> puts them at the end
+  of your file between two marks, changes nothing else in it, and <code>uninstall generic</code> takes them out again.</p>
+
+  <p class="kicker" aria-hidden="true">// 05 · all hands</p>
+  <h2 id="help-wanted">Help wanted</h2>
+  <p>Only Claude Code is tried live. Every other row of the table is <b>not tried</b>: built from the tool's documentation and
+  covered by smoke tests with simulated hook input. Codex, Cursor, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin and Kiro have never run
+  Driftless, OpenCode only once, before the economic rule, and no real agent has ever followed the <code>AGENTS.md</code> of
+  level 2. The author works on Claude Code only, so none of it will be tried here. If you use one of them, please try it and
+  open an issue with the tool and its version, your operating system, the output of <code>node &lt;clone&gt;/scripts/driftless.mjs status</code>
+  run in the project and of <code>doctor &lt;tool&gt;</code> (every tool of level 1 but Claude Code has one), and what happened at the first handoff: was it asked for by
+  itself, did the handoff agent run, did a fresh session open, and where. At level 2: did the agent run <code>begin</code> and
+  <code>step</code> because <code>AGENTS.md</code> says so, or only when you told it to. "It worked" is worth as much as a bug
+  report.</p>
+
+  <p class="kicker" aria-hidden="true">// 06 · safe harbour</p>
+  <h2>Trust once</h2>
+  <p>Agents ask whether to trust a folder they have never opened, and a new project is a new folder. Trust
+  is a security decision, so Driftless does not take it for you. Keep your projects under one folder and
+  trust that folder once: every project created there opens without asking.</p>
+
+  <p class="kicker" aria-hidden="true">// 07 · drop anchor</p>
+  <h2>Stop it</h2>
+  <p>Done for the day? Say so: the agent runs the handoff, the project is released, no new window opens, and Driftless is
+  still on tomorrow. Asked for a handoff at a bad moment? Say "not now", and it asks again a step further on.</p>
+  <p>No service runs: Driftless lives in the agent's hooks, and the only thing it starts on its own is a short weekly replay of your
+  history, which stays on your machine and ends by itself. Tell the agent "stop Driftless",
+  or run <code>off</code> for one project, <code>off --global</code> for all of them, and <code>on</code> to
+  switch it back. A handoff already asked for is dropped.</p>
+
+  <p class="kicker" aria-hidden="true">// 08 · change of watch</p>
+  <h2>When it hands off</h2>
+  <p>By default, when it pays. Every request re-reads the context from the cache, a little money each time; a fresh start
+  costs once. Driftless keeps both figures with the prices of your model and hands off when they meet: no threshold to tune,
+  on any price list, and a short session about to end is left alone. It also stops before a price jump and always by 260,000 tokens
+  or 80% of the window, in Claude Code even in the middle of a long turn and inside subagents. Native automatic and idle compaction are blocked in Claude Code; a <code>/compact</code> you type still works.</p>
+  <p>Prefer a number? Set <code>token_cap</code>, <code>cap_percent</code> or both: the lower wins, and your cap always wins over the rule.</p>
+  <p>Back after a long pause? The prompt cache lives an hour, and the first message after it re-sends the whole context at the write price. With <code>cold_restart</code> on (off by default, Claude Code), that message goes on in a fresh session with the end of the conversation instead: about 0.6 points of the whole bill on the author's history, seen live once. A background task that reports or a scheduled task that fires is not a message of yours, and is left where it is.</p>
+  <p>A session that ends with no handoff (window closed, machine off) loses nothing: at every answer Driftless copies the end of the conversation to <code>.driftless/snapshot.md</code>, out of git and out of your documents, and points the next session to it only when it is needed. No tokens, about 15 ms.</p>
+  <p>A status line says where the session stands without opening <code>/context</code>: <code>Driftless · ctx 142k/260k (55%) · cache 37m · saved $67.82</code>, the context against the handoff limit, the minutes left on the prompt cache, the saving so far. No tokens; never written over a status line of yours; <code>statusline off</code> removes it.</p>
+
+  <p class="kicker" aria-hidden="true">// 09 · sailor's glossary</p>
+  <h2>What the words mean</h2>
+  <p>We talk about agents as if they were colleagues, and it helps until it misleads. Here is the mechanism behind each figure of speech.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>We say</th><th>What actually happens</th></tr></thead>
+    <tbody>
+      <tr><td>It remembers</td><td>Nothing survives between sessions except files. Within a session, the whole context is sent again at every request, and paid for.</td></tr>
+      <tr><td>The context rots</td><td>A figure of speech. The rising cost is measured; a loss of quality is not, at least not by us.</td></tr>
+      <tr><td>It hands off to a new session</td><td>No conversation takes place. The fresh session knows only what the three documents say, so they have to stand on their own.</td></tr>
+      <tr><td>It takes a break</td><td>Nothing rests. The prompt cache expires, and the next request pays to write the whole context again.</td></tr>
+      <tr><td>It thinks it over</td><td>Thinking is output: paid when written, and read again afterwards when the model preserves it. The effort setting governs it more reliably than instructions do.</td></tr>
+      <tr><td>It delegates to a colleague</td><td>A subagent starts from nothing we know, with its own fixed cost. It needs a brief that says everything.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <footer><span class="anchor" aria-hidden="true">&#9875;</span>MIT licence. No server, no account, nothing to pay: Driftless runs on your machine, inside the agent you already use.</footer>
+</main>
+</body>
+</html>

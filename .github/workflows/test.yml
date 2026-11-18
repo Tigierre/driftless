@@ -1,0 +1,23 @@
+name: test
+# Private for now: started by hand only (Actions tab → test → Run workflow), so no minutes are spent
+# on every push. When the repository goes public, add "push" and "pull_request" back: they are free there.
+on: [workflow_dispatch]
+# The tests only read the repository: the token GitHub gives the job can do no more than that.
+permissions:
+  contents: read
+jobs:
+  smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Actions are pinned to a commit, not to a tag that can be moved; the tag is in the comment.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test

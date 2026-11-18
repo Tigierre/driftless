@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Driftless: a sail seen through a porthole. icon.png and icon-32.png are this file rendered at 180 and 32 px. -->
+  <defs>
+    <linearGradient id="sail" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#4b2ea3"/><stop offset="1" stop-color="#763fb5"/>
+    </linearGradient>
+    <clipPath id="glass"><circle cx="64" cy="64" r="52"/></clipPath>
+  </defs>
+  <circle cx="64" cy="64" r="52" fill="#ebf6f6"/>
+  <g clip-path="url(#glass)">
+    <path d="M0 86 C20 78 40 94 64 86 S104 78 128 86 V128 H0 Z" fill="#4b936d"/>
+    <path d="M66 24 C82 36 94 56 96 78 L66 80 Z" fill="url(#sail)"/>
+    <path d="M60 34 C52 48 44 64 38 81 L60 80 Z" fill="url(#sail)"/>
+  </g>
+  <circle cx="64" cy="64" r="56" fill="none" stroke="url(#sail)" stroke-width="10"/>
+</svg>

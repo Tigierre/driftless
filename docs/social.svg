@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="Driftless: hand off before the context rots">
+  <title>Driftless: hand off before the context rots</title>
+  <!-- The source of social.png (the link preview), in the page's day theme. To render it again: open this file from
+       docs/ in a browser window of 1200 by 630 (it reads arena-light.webp next to it) and take a screenshot. -->
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#0d625d" stroke-opacity=".07"/>
+    </pattern>
+    <linearGradient id="sail" x1="0" y1="0" x2="1" y2="0.35">
+      <stop offset="0" stop-color="#4b2ea3"/><stop offset="1" stop-color="#763fb5"/>
+    </linearGradient>
+    <clipPath id="glass"><circle cx="64" cy="64" r="52"/></clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="#ebf6f6"/>
+  <image href="arena-light.webp" xlink:href="arena-light.webp" x="0" y="6" width="1200" height="624" preserveAspectRatio="xMidYMax meet"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <!-- Mark and name, then the wave under them, as at the top of the page. -->
+  <g transform="translate(80 56) scale(.5)">
+    <circle cx="64" cy="64" r="52" fill="#ebf6f6"/>
+    <g clip-path="url(#glass)">
+      <path d="M0 86 C20 78 40 94 64 86 S104 78 128 86 V128 H0 Z" fill="#4b936d"/>
+      <path d="M66 24 C82 36 94 56 96 78 L66 80 Z" fill="url(#sail)"/>
+      <path d="M60 34 C52 48 44 64 38 81 L60 80 Z" fill="url(#sail)"/>
+    </g>
+    <circle cx="64" cy="64" r="56" fill="none" stroke="url(#sail)" stroke-width="10"/>
+  </g>
+  <text x="156" y="107" font-family="'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif" font-size="38" font-weight="700" fill="#152428">Driftless</text>
+  <path d="M80 146 q13 -9 26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0 t26 0" fill="none" stroke="#0d625d" stroke-opacity=".45" stroke-width="2"/>
+  <!-- The opening lines. -->
+  <text x="80" y="214" font-family="ui-monospace, 'Cascadia Code', 'Cascadia Mono', Menlo, Consolas, monospace" font-size="22" fill="#0d625d">// captain's log</text>
+  <g font-family="'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif" font-size="72" font-weight="700" fill="#152428">
+    <text x="78" y="292">Hand off before</text>
+    <text x="78" y="372">the context rots.</text>
+  </g>
+  <text x="80" y="430" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="28" fill="#435a5e">A fresh session, opened by itself, that picks up where you were.</text>
+  <!-- The five steps, a route on the chart that ends on the X. -->
+  <g transform="translate(80 470)" font-family="ui-monospace, 'Cascadia Code', 'Cascadia Mono', Menlo, Consolas, monospace" font-size="20" font-weight="700" fill="#152428">
+    <g stroke="#ac1b6e" stroke-width="2" stroke-dasharray="6 5">
+      <path d="M188 36H213M401 36H426M614 36H639M827 36H852"/>
+    </g>
+    <g fill="#f8fdfd" stroke="#c5d9d9">
+      <rect width="188" height="72" rx="10"/><rect x="213" width="188" height="72" rx="10"/><rect x="426" width="188" height="72" rx="10"/>
+      <rect x="639" width="188" height="72" rx="10"/><rect x="852" width="188" height="72" rx="10" stroke="#ac1b6e"/>
+    </g>
+    <g fill="none" stroke="#b5832a" stroke-width="2">
+      <circle cx="30" cy="36" r="15"/><circle cx="243" cy="36" r="15"/><circle cx="456" cy="36" r="15"/><circle cx="669" cy="36" r="15"/><circle cx="882" cy="36" r="15"/>
+    </g>
+    <g font-size="16" fill="#82510a" text-anchor="middle">
+      <text x="30" y="42">1</text><text x="243" y="42">2</text><text x="456" y="42">3</text><text x="669" y="42">4</text><text x="882" y="42">5</text>
+    </g>
+    <text x="54" y="43">Watch</text><text x="267" y="43">Hand off</text><text x="480" y="43">Write down</text>
+    <text x="693" y="43">Reopen</text><text x="906" y="43">Resume</text>
+    <path d="M1012 12l14 14M1026 12l-14 14" stroke="#ac1b6e" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="80" y="596" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" fill="#435a5e">For Claude Code and ten more agents · no server, no account · MIT</text>
+</svg>

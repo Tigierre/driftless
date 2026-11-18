@@ -1,0 +1,11 @@
+{
+  "name": "driftless",
+  "owner": { "name": "Driftless contributors" },
+  "plugins": [
+    {
+      "name": "driftless",
+      "source": "./",
+      "description": "Hands off before context rot: a goal that never drifts, a living design doc, a self-compressing logbook, and an automatic handoff that resumes in a fresh session."
+    }
+  ]
+}

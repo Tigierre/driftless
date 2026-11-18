@@ -1,0 +1,248 @@
+{
+  "as_of": "2026-11-15",
+  "unit": "USD per million tokens, standard tier",
+  "sources": [
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://developers.openai.com/api/docs/pricing"
+  ],
+  "models": {
+    "claude-fable-5-2": {
+      "input": 8,
+      "write_short": 10,
+      "write_long": 16,
+      "read": 0.2,
+      "output": 40
+    },
+    "claude-mythos-5-2": {
+      "input": 8,
+      "write_short": 10,
+      "write_long": 16,
+      "read": 0.2,
+      "output": 40
+    },
+    "claude-mythos-5-1": {
+      "input": 10,
+      "write_short": 12.5,
+      "write_long": 20,
+      "read": 0.25,
+      "output": 50
+    },
+    "claude-mythos-5": {
+      "input": 10,
+      "write_short": 12.5,
+      "write_long": 20,
+      "read": 1,
+      "output": 50
+    },
+    "claude-fable-5-1": {
+      "input": 10,
+      "write_short": 12.5,
+      "write_long": 20,
+      "read": 0.25,
+      "output": 50
+    },
+    "claude-fable-5": {
+      "input": 10,
+      "write_short": 12.5,
+      "write_long": 20,
+      "read": 1,
+      "output": 50
+    },
+    "claude-opus-5-5": {
+      "input": 4,
+      "write_short": 5,
+      "write_long": 8,
+      "read": 0.2,
+      "output": 20
+    },
+    "claude-opus-5": {
+      "input": 5,
+      "write_short": 6.25,
+      "write_long": 10,
+      "read": 0.5,
+      "output": 25
+    },
+    "claude-opus-4-8": {
+      "input": 5,
+      "write_short": 6.25,
+      "write_long": 10,
+      "read": 0.5,
+      "output": 25
+    },
+    "claude-opus-4-7": {
+      "input": 5,
+      "write_short": 6.25,
+      "write_long": 10,
+      "read": 0.5,
+      "output": 25
+    },
+    "claude-opus-4-6": {
+      "input": 5,
+      "write_short": 6.25,
+      "write_long": 10,
+      "read": 0.5,
+      "output": 25
+    },
+    "claude-sonnet-5-5": {
+      "input": 2,
+      "write_short": 2.5,
+      "write_long": 4,
+      "read": 0.1,
+      "output": 10
+    },
+    "claude-sonnet-5": {
+      "input": 2,
+      "write_short": 2.5,
+      "write_long": 4,
+      "read": 0.2,
+      "output": 10
+    },
+    "claude-sonnet-4-6": {
+      "input": 3,
+      "write_short": 3.75,
+      "write_long": 6,
+      "read": 0.3,
+      "output": 15
+    },
+    "claude-sonnet-4-5": {
+      "input": 3,
+      "write_short": 3.75,
+      "write_long": 6,
+      "read": 0.3,
+      "output": 15
+    },
+    "claude-haiku-5-5": {
+      "input": 0.1,
+      "write_short": 0.125,
+      "write_long": 0.2,
+      "read": 0.01,
+      "output": 0.5,
+      "jump": {
+        "at": 100000,
+        "input": 5,
+        "output": 5
+      }
+    },
+    "claude-haiku-4-5": {
+      "input": 1,
+      "write_short": 1.25,
+      "write_long": 2,
+      "read": 0.1,
+      "output": 5
+    },
+    "gpt-6-astra": {
+      "input": 10,
+      "write_short": 12.5,
+      "read": 1,
+      "output": 50,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-6.1-sol": {
+      "input": 2,
+      "write_short": 2.5,
+      "read": 0.1,
+      "output": 10,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-6.1-terra": {
+      "input": 1,
+      "write_short": 1.25,
+      "read": 0.05,
+      "output": 5,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-6-sol": {
+      "input": 2,
+      "write_short": 2.5,
+      "read": 0.2,
+      "output": 10,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-6-luna": {
+      "input": 0.1,
+      "write_short": 0.125,
+      "read": 0.01,
+      "output": 0.5,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-5.6-sol": {
+      "input": 4,
+      "write_short": 5,
+      "read": 0.4,
+      "output": 20,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    },
+    "gpt-5.6-luna": {
+      "input": 0.2,
+      "write_short": 0.25,
+      "read": 0.02,
+      "output": 1.2,
+      "jump": {
+        "at": 272000,
+        "input": 2,
+        "output": 1.5
+      }
+    }
+  },
+  "handoff_model": {
+    "claude": "claude-sonnet-5-5"
+  },
+  "defaults": {
+    "handoff_tokens": {
+      "agent": {
+        "input": 12,
+        "write": 38900,
+        "read": 137000,
+        "output": 7200
+      },
+      "thread": {
+        "requests": 3,
+        "write": 5800,
+        "output": 4100
+      }
+    },
+    "first_request_cache_share": 0.39,
+    "resume_rise": 21000,
+    "rediscovery": 4927,
+    "growth_per_request": 1689,
+    "jump_guard": 0.6,
+    "window_ceiling": 0.8,
+    "fallback_cap": 250000,
+    "guard_ask": 260000,
+    "guard_insist": 285000,
+    "tokens_per_char": {
+      "claude": 0.45,
+      "other": 0.25
+    },
+    "tokens_per_result_char": 0.48,
+    "subagent": {
+      "report_tokens": 2000,
+      "rediscovery": 10000,
+      "rediscovery_share": 0.5
+    }
+  }
+}

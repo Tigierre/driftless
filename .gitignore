@@ -1,0 +1,5 @@
+node_modules/
+.DS_Store
+# Driftless state and personal settings, when this clone is opened as a project
+.driftless/
+.claude/settings.local.json
