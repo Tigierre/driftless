@@ -1,0 +1,22 @@
+name: Bug
+description: Something Driftless did, or did not do, on Claude Code or any other tool.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Tool, version and operating system
+      placeholder: e.g. Claude Code 2.1.327 in VS Code, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of status
+      description: "`node <clone>/scripts/driftless.mjs status` in the project's folder (in Claude Code, ask the agent for Driftless' status). Remove anything private first."
+      render: text

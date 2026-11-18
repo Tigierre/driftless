@@ -4,11 +4,14 @@
 
 ## What the fresh session is allowed to do
 
-**The fresh session inherits the permission mode of the session that handed off**, bypass included: if you work with
-`--dangerously-skip-permissions` (or `bypassPermissions`), so will the session Driftless opens for you, with nobody watching
-it start. That is on purpose (a fresh session that falls back to a stricter default stalls on the first tool), but it is
-yours to decide. Plan mode is the one exception: the fresh session is there to do the next step, so it starts in your
-default mode instead.
+**The fresh session inherits the permission mode of the session that handed off, except bypass.** If you work with
+`--dangerously-skip-permissions` (or `bypassPermissions`), the session Driftless opens for you starts in `acceptEdits`:
+it edits files without asking and asks before anything else, because nobody is watching it start. To let it bypass
+permissions too, turn on the plugin option **Fresh session keeps bypass** (`carry_bypass`), or set
+`DRIFTLESS_CARRY_BYPASS=1` for the other agents (Codex's `--dangerously-bypass-approvals-and-sandbox`, Qwen Code's `yolo`
+follow the same rule). It is an opt-in on your machine: a project cannot turn it on. Every other mode is carried as it
+is (a fresh session that falls back to a stricter default stalls on the first tool). Plan mode is the one exception: the
+fresh session is there to do the next step, so it starts in your default mode instead.
 
 To make fresh sessions start stricter than the session before, set the mode in the project's `.driftless/config.json`:
 

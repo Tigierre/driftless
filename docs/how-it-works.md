@@ -11,7 +11,7 @@ carry the context reaches the cost of a fresh start. It is the classic rent-or-b
 worse than twice the best possible choice, and leaves alone a short session that is about to end.
 
 The cost of a fresh start is built from its parts, each at the price of the model that pays it: the handoff agent's
-own run (measured on 38 handoffs: about 39,000 tokens written to the 5-minute cache, 137,000 read, 7,200 of output),
+own run (its tokens measured on 38 handoffs, a later and larger sample than the 17 whose cost the README's replay uses: about 39,000 tokens written to the 5-minute cache, 137,000 read, 7,200 of output),
 the session's three requests around it (the launch, the line while the agent works, the closing one: each reads the
 whole context again), the new session's start and what it reads again. On Opus 5.5 with the agent on Sonnet 5.5 that
 is about $0.80 for a session that restarts at 80,000 tokens. What your own rules ask at every handoff on top of
@@ -80,7 +80,7 @@ A run that is not recognised is asked as a session is: what Driftless did everyw
 are covered by their plugin (above; not in OpenCode 2, where the plugin cannot see how a session was started). Devin and Kiro are asked through the agent's own `step` (above): there such a run is
 told at its start that nothing is asked of it, and a `step` it runs all the same asks nothing. On macOS the arguments of a
 process come as one line, where the words of a prompt cannot be told from switches: only the switches before the prompt
-are read there.
+are read there (after Kiro's `chat`), so `qwen "fix it" -i "then stay"` counts there as a run of one prompt.
 
 **Inside subagents, too (Claude Code).** A subagent can grow by hundreds of thousands of tokens on its own. After each of its
 tool steps Driftless reads its transcript: past 260,000 tokens it is told once to finish the step in progress and reply with

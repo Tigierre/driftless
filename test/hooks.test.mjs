@@ -16,7 +16,10 @@ const DEAD_PID = 999_999;
 const sealFor = (s, id) => crypto.createHmac('sha256', fs.readFileSync(path.join(s.home, '.driftless', 'key'), 'utf8').trim()).update(id).digest('hex').slice(0, 32);
 
 function sandbox() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'driftless-test-'));
+  // The real path: on macOS the temporary folder is a link (/var → /private/var), and an agent's working folder is the
+  // real one, so the bench's paths and the hook's would name the same project two ways. The native one: on Windows the
+  // temporary folder can come in its short 8.3 form (C:\Users\RUNNER~1 on GitHub's runner), which programs give long.
+  const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'driftless-test-')));
   // The bench's own terminal is not the case's: a case that needs one says so (TERM), or it would pass in a terminal
   // and fail in a container, where there is none. Nor is the bench's CI job (CI, GITHUB_ACTIONS: Gemini CLI reads both as
   // "nobody at the keyboard"), nor the shell's NoDefaultCurrentDirectoryInExePath (Claude Code
@@ -672,7 +675,8 @@ test('a project config cannot loosen the fresh session, and only plain words of 
   assert.equal(after(handoff({ permission_mode: 'bypassPermissions' }), '--permission-mode'), undefined);
   // Stricter, or the same: taken.
   assert.equal(after(handoff({ permission_mode: 'plan' }, { permission_mode: 'bypassPermissions' }), '--permission-mode'), 'plan');
-  assert.equal(after(handoff({ permission_mode: 'bypassPermissions' }, { permission_mode: 'bypassPermissions' }), '--permission-mode'), 'bypassPermissions');
+  // Bypass itself is carried only when the user opted in (the next test): without that, the fresh session asks.
+  assert.equal(after(handoff({ permission_mode: 'bypassPermissions' }, { permission_mode: 'bypassPermissions' }), '--permission-mode'), 'acceptEdits');
   // A mode nobody knows, or one that is not a word, is not a mode.
   assert.equal(after(handoff({ permission_mode: 'everything' }, { permission_mode: 'acceptEdits' }), '--permission-mode'), 'acceptEdits');
   assert.equal(after(handoff({ permission_mode: 'plan" --dangerously-skip-permissions "' }, { permission_mode: 'acceptEdits' }), '--permission-mode'), 'acceptEdits');
@@ -825,16 +829,22 @@ test('the fresh session keeps the model and effort of the session that handed of
   assert.equal(b[b.indexOf('--effort') + 1], 'medium');
 });
 
-test('the fresh session keeps the permission mode of the session that opened it', () => {
+test('the fresh session keeps the permission mode of the session that opened it, bypass only when the user opted in', () => {
   const s = sandbox();
   const root = s.project('xi');
   const dir = path.join(s.home, 'claude-config', 'projects', 'x');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'sid-7.jsonl'), ['default', 'bypassPermissions']
     .map((m) => JSON.stringify({ type: 'user', permissionMode: m })).join('\n') + '\n');
-  s.run(['open', root], undefined, { CLAUDE_CODE_SESSION_ID: 'sid-7' });
-  const opened = s.read(root, '.driftless', 'dry-open.json').args;
-  assert.equal(opened[opened.indexOf('--permission-mode') + 1], 'bypassPermissions');
+  const mode = (env) => {
+    s.run(['open', root], undefined, { CLAUDE_CODE_SESSION_ID: 'sid-7', ...env });
+    const opened = s.read(root, '.driftless', 'dry-open.json').args;
+    return opened[opened.indexOf('--permission-mode') + 1];
+  };
+  assert.equal(mode(), 'acceptEdits'); // nobody watches the fresh session start: bypass is not carried by default
+  assert.equal(mode({ CLAUDE_PLUGIN_OPTION_CARRY_BYPASS: 'true' }), 'bypassPermissions');
+  assert.equal(mode({ DRIFTLESS_CARRY_BYPASS: '1' }), 'bypassPermissions');
+  assert.equal(mode({ CLAUDE_PLUGIN_OPTION_CARRY_BYPASS: 'false' }), 'acceptEdits');
   s.run(['open', root], undefined, { CLAUDE_CODE_SESSION_ID: 'unknown' });
   assert.ok(!s.read(root, '.driftless', 'dry-open.json').args.includes('--permission-mode'));
 });
@@ -2123,10 +2133,17 @@ test('Codex: tokens from the rollout, handoff asked over the cap, reopened with 
   assert.match(r.json.reason, /120,000 tokens/);
   fs.writeFileSync(path.join(root, '.driftless', 'handoff.json'), JSON.stringify({ session_id: 'x1' }));
   // Outside a terminal Codex gets no window (the surface cases): this session runs in one.
-  s.run(['stop', '--harness', 'codex'], { cwd: root, session_id: 'x1', transcript_path: t, permission_mode: 'bypassPermissions' }, { TERM: 'xterm' });
+  s.run(['stop', '--harness', 'codex'], { cwd: root, session_id: 'x1', transcript_path: t, permission_mode: 'bypassPermissions' }, { TERM: 'xterm', DRIFTLESS_CARRY_BYPASS: '1' });
   const open = s.read(root, '.driftless', 'dry-open.json');
   assert.equal(open.exe, 'codex');
   assert.deepEqual(open.args.slice(0, 3), ['--dangerously-bypass-approvals-and-sandbox', '-C', root]);
+  // Without the user's opt-in, bypass is not carried: Codex starts in the user's own approval mode.
+  const r2 = s.project('cx2', { token_cap: 100_000 });
+  s.run(['session-start', '--harness', 'codex'], { cwd: r2, session_id: 'x2', pid: process.pid });
+  s.run(['stop', '--harness', 'codex'], { cwd: r2, session_id: 'x2', transcript_path: t });
+  fs.writeFileSync(path.join(r2, '.driftless', 'handoff.json'), JSON.stringify({ session_id: 'x2' }));
+  s.run(['stop', '--harness', 'codex'], { cwd: r2, session_id: 'x2', transcript_path: t, permission_mode: 'bypassPermissions' }, { TERM: 'xterm' });
+  assert.deepEqual(s.read(r2, '.driftless', 'dry-open.json').args.slice(0, 2), ['-C', r2]);
 });
 
 // The lines Codex writes in its session log (openai/codex at 69231e1: TokenUsageInfo in codex-rs/protocol, written by
@@ -2321,11 +2338,13 @@ test('the other harnesses: a run of one prompt is asked nothing; a session, a se
   for (const [harness, args] of [
     ['codex', []], ['codex', ['fix the exec path']],
     ['gemini', ['-i', 'fix what -p does']], ['gemini', ['--acp']],
-    ['qwen', ['fix it', '-i', 'then stay']], // a prompt and -i: Qwen Code starts with it and stays
     ['qwen', ['--input-format', 'stream-json', '--output-format', 'stream-json', '--channel=SDK', '--allowed-tools', 'read_file', 'edit']], // as its SDKs start it
     ['copilot', ['--acp']],
     ['cursor', ['fix what --print does']],
   ]) assert.equal(asked(harness, args), true, `${harness} ${args.join(' ')}: a session`);
+  // A prompt and -i: Qwen Code starts with it and stays. Not on macOS, where the command line comes as one string and a
+  // switch after the prompt cannot be told from a prompt that names it: there only the switches before the prompt count.
+  assert.equal(asked('qwen', ['fix it', '-i', 'then stay']), process.platform !== 'darwin', 'qwen: a prompt, then -i');
   // Gemini CLI in a CI job is headless with no switch at all, and the hook is in the same environment; -i and the server
   // an editor talks to stay what they are there too.
   assert.equal(asked('gemini', [], { env: { CI: 'true' } }), false);

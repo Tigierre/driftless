@@ -2,6 +2,8 @@
 
 # Driftless
 
+[![test](https://github.com/Tigierre/driftless/actions/workflows/test.yml/badge.svg)](https://github.com/Tigierre/driftless/actions/workflows/test.yml)
+
 **Hand off before the context rots — and never drift from what you set out to do.**
 
 **Watch** the context → **hand off** when carrying it costs more than a fresh start → **write down** where things stand →
@@ -25,6 +27,9 @@ distills the session into those documents and reopens the project in a fresh ses
 
 ## Install
 
+Driftless needs **Node.js 20 or later** on your PATH: every hook runs `node`, and Claude Code's native installer
+does not bring it.
+
 **Claude Code** — as a plugin:
 
 ```
@@ -32,7 +37,8 @@ distills the session into those documents and reopens the project in a fresh ses
 /plugin install driftless@driftless
 ```
 
-To try it on one project only, from that project's folder (a local clone works as the marketplace, and runs from where it is):
+To try it on one project only, run these from that project's folder (to run it from a clone of this repository instead,
+give the clone's folder in place of `Tigierre/driftless`):
 
 ```
 claude plugin marketplace add Tigierre/driftless --scope local
@@ -46,7 +52,8 @@ is a new folder, so its first fresh session would stop on that question. That is
 cannot take for you, and it should not: trust is a security decision. No setting or flag skips it.
 
 Outside a git repository, trust covers subfolders. So keep your projects under one folder and trust that
-folder once, right after installing:
+folder once, right after installing (and set it as the plugin's **Projects folder**, `projects_root`, so new projects
+are created there):
 
 ```
 cd <the folder that holds your projects>
@@ -59,7 +66,7 @@ so it asks once, the first time.
 
 ### Other tools
 
-Clone the repository (Node.js 18+), then once per tool `node <clone>/scripts/driftless.mjs install <tool>`, where `<clone>`
+Clone the repository (`git clone https://github.com/Tigierre/driftless.git`; Node.js 20+), then once per tool `node <clone>/scripts/driftless.mjs install <tool>`, where `<clone>`
 is the folder you cloned it into; `uninstall <tool>` removes exactly what `install` added. Keep the clone: the hooks run from it.
 
 What you get depends on what the tool lets Driftless hang on to:
@@ -76,7 +83,7 @@ What you get depends on what the tool lets Driftless hang on to:
 | Claude Code | 1 | plugin | **yes**: on Windows, at every change |
 | Codex | 1 | `install codex` | no |
 | Cursor | 1 | `install cursor` | no |
-| OpenCode | 1 | `install opencode` | once, before the economic rule |
+| OpenCode | 1 | `install opencode` | no (one early try, before the economic rule) |
 | Kilo Code | 1 | `install kilo` | no |
 | Amp | 1 | `install amp`, or `install amp <project folder>` | no |
 | Qwen Code | 1 | `install qwen` | no |
@@ -145,14 +152,17 @@ person, one month, Opus 5.5, at list prices.
 
 | Against | What | Saving |
 |---|---|---|
-| never resetting | everything built today: rule, size guards, diet, command output limit (replayed, with the handoff priced as 17 real handoffs cost and the re-reads after a cut output counted; the lighter start estimated, quality not measured) | **27.0% to 31.3% of the whole bill** (29.5% in the middle) |
-| never resetting | the rule alone, main thread (`audit --all`, 97 pieces of work) | 30.1% (95% interval 18.2% to 43.6%) |
+| never resetting | everything built today: rule, size guards, diet, command output limit (replayed on 73 pieces of work, with the handoff priced at what 17 measured handoffs cost and the re-reads after a cut output counted; the lighter start estimated, quality not measured) | **27.0% to 31.3% of the whole bill** (29.5% in the middle) |
+| never resetting | the rule alone, main thread (`audit --all`, run later on a larger history: 97 pieces of work) | 30.1% (95% interval 18.2% to 43.6%) |
 | never resetting | the rule alone, whole bill with subagents | 19.3% |
 | the same author's careful manual handoffs | the rule, main thread | 3.5%: the value is not having to watch a meter |
 | short work, under 100 requests | the rule | about 0% |
 
 Ten long pieces of work out of 73 make 85% of the saving; without them the rule saves about 10%. Your history is not the
 author's: `audit` replays yours (see [Ask your own history](#ask-your-own-history)).
+
+**The goal was 50% off the whole bill, subagents included, at the same model: it is not reached.** What is built today
+gives the 27% to 31% above; the rest of the way was studied and no lever left at the same model is worth a release.
 
 ### Ask your own history
 
@@ -176,8 +186,9 @@ same handoff, the project is released, no new window opens, and Driftless is sti
 ends there unless you ask to go on in a fresh session. If Driftless asks for a handoff at a bad moment, say "not now": the
 request comes back once the context has grown by another 50,000 tokens (`later`), and the next session starts clean.
 
-Driftless runs no service: it lives in the agent's hooks, and the only thing it starts on its own is the weekly replay above, which
-ends by itself. To stop it without uninstalling, tell the agent; it knows the command:
+Driftless runs no service: it lives in the agent's hooks. What it starts on its own ends by itself: the weekly replay
+([Does it save you anything?](docs/savings.md)), the count of a session's saving after it ends, and, in VS Code, the
+headless start of the fresh session that the panel then opens. To stop it without uninstalling, tell the agent; it knows the command:
 
 | Say | What happens |
 |---|---|
@@ -197,8 +208,9 @@ uninstalls it.
 Driftless runs as a hook of your agent, in folders you may have cloned from anyone. What it does about it, each point
 in full in [Safety](docs/safety.md):
 
-- **The fresh session inherits the permission mode of the session that handed off**, bypass included. A project's
-  `.driftless/config.json` can make it stricter, never looser; plan mode is never handed on.
+- **The fresh session inherits the permission mode of the session that handed off, except bypass:** nobody watches it
+  start, so a session in bypass hands off to one in `acceptEdits`, unless you turn on the option `carry_bypass`. A
+  project's `.driftless/config.json` can make it stricter, never looser; plan mode is never handed on.
 - **What a cloned folder brings in `.driftless/` is not taken for yours:** the files that say which session drives
   carry a seal only your machine can make.
 - **What it reads into the context stays inside the project:** a document that leads outside it is not read, and
@@ -219,7 +231,7 @@ as `/name`. How it decides, and how to see or undo it: [The diet](docs/diet.md).
 
 ## Requirements and limits
 
-- Node.js 18+ on PATH — every hook is one script, `scripts/driftless.mjs` (OpenCode, Kilo Code and Amp run it in-process).
+- Node.js 20+ on PATH — every hook is one script, `scripts/driftless.mjs` (OpenCode, Kilo Code and Amp run it in-process).
 - The fresh session opens where the session that handed off was running. From the VS Code extension (or a
   fork that runs it): the resume runs headless, then a link opens it in a new tab of the panel, in the same
   editor window (found from the session's process and the editor's own logs), with the answer already there,
@@ -249,7 +261,7 @@ Only Claude Code is tried live. Every other row of the [table](#install) is **no
 documentation and covered by the smoke tests. Codex, Cursor, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin and Kiro
 have never run Driftless, OpenCode only once, before the economic rule, and no real agent has ever followed the `AGENTS.md` of level 2.
 The author works on Claude Code only, so none of it will be tried here. If you use one of them, please try it and open
-an issue with:
+an issue (**New issue → Tried on a tool** asks for all of it):
 
 - the tool and its version, and your operating system;
 - the output of `node <clone>/scripts/driftless.mjs status` and of `doctor <tool>`, both run in the project's folder (every tool
@@ -269,4 +281,4 @@ npm test        # smoke tests, each hook and command in a throwaway home; no mod
 
 ## License
 
-MIT
+MIT. Security problems: see [SECURITY.md](SECURITY.md).

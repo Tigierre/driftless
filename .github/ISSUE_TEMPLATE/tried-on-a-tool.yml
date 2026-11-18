@@ -1,0 +1,45 @@
+name: Tried on a tool
+description: You ran Driftless on Codex, Cursor, OpenCode, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin, Kiro or an AGENTS.md agent. "It worked" is worth as much as a bug report.
+title: "Tried on <tool>: "
+labels: ["tried-on-a-tool"]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool and version
+      placeholder: e.g. Codex 0.98.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11, macOS 15, Ubuntu 24.04
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of status and doctor
+      description: Run both in the project's folder. Every tool of level 1 but Claude Code has a doctor.
+      placeholder: |
+        node <clone>/scripts/driftless.mjs status
+        node <clone>/scripts/driftless.mjs doctor <tool>
+      render: text
+  - type: textarea
+    id: handoff
+    attributes:
+      label: What happened at the first handoff
+      description: Was it asked for by itself? Did the handoff agent run? Did a fresh session open, and where? At level 2, did the agent run `begin` and `step` because AGENTS.md says so, or only when you told it to?
+    validations:
+      required: true
+  - type: dropdown
+    id: verdict
+    attributes:
+      label: In one word
+      options:
+        - It worked
+        - It worked in part
+        - It did not work
+    validations:
+      required: true

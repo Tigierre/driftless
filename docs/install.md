@@ -16,7 +16,7 @@ What you get depends on what the tool lets Driftless hang on to:
 | Claude Code | 1 | plugin | **yes**: on Windows, at every change |
 | Codex | 1 | `install codex` | no |
 | Cursor | 1 | `install cursor` | no |
-| OpenCode | 1 | `install opencode` | once, before the economic rule |
+| OpenCode | 1 | `install opencode` | no (one early try, before the economic rule) |
 | Kilo Code | 1 | `install kilo` | no |
 | Amp | 1 | `install amp`, or `install amp <project folder>` | no |
 | Qwen Code | 1 | `install qwen` | no |
@@ -43,7 +43,7 @@ claude plugin marketplace add Tigierre/driftless --scope local
 claude plugin install driftless@driftless --scope local
 ```
 
-**Codex, Cursor, OpenCode** — clone the repository (Node.js 18+), then once per tool (`<clone>` is the folder you cloned it
+**Codex, Cursor, OpenCode** — clone the repository (Node.js 20+), then once per tool (`<clone>` is the folder you cloned it
 into; keep it, the hooks run from there):
 
 ```
@@ -61,7 +61,7 @@ node <clone>/scripts/driftless.mjs install opencode   # plugin in ~/.config/open
 | Handoff asked by itself | ✅ | ✅ | ✅ (follow-up message) | ✅ |
 | Fresh session by itself | where you work: VS Code panel, desktop app or terminal | from a terminal: new terminal window | from a terminal: new terminal window, **Cursor CLI** | **same window**, new session |
 | One-time step | trust the projects folder | approve the hooks once (`/hooks`) | install the Cursor CLI, `agent login`, reload Cursor | — |
-| Tried live | on Windows, at every change; macOS never | never | never | once, before the economic rule |
+| Tried live | on Windows, at every change; macOS never | never | never | no (one early try, before the economic rule) |
 
 - **Codex** reviews new hooks before running them: approve Driftless' two hooks once with `/hooks`. Until you
   do, Codex skips them without a word, and an install that looks done does nothing. `node <clone>/scripts/driftless.mjs
@@ -137,7 +137,7 @@ node <clone>/scripts/driftless.mjs install opencode   # plugin in ~/.config/open
   and no more: times, counts, the process, the hook's event name, versions. Tried on the test bench, which runs
   the hooks as `install` wrote them: no tool has run them yet.
 - **Claude Code** is tried live on Windows (VS Code panel, terminal) at every change. macOS has never been tried, Linux
-  only in a container without a model, and the CI workflow has not run yet. Installing from a clone of this
+  only in a container without a model; the smoke tests run on Linux, macOS and Windows at every push. Installing from a clone of this
   repository into an empty profile has been tried once, on Windows, up to a real handoff, but with the author's login
   (so not a true first run); installing from GitHub has not been tried.
 

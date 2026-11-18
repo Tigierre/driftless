@@ -72,7 +72,7 @@ const ADAPTERS = {
     },
     // Same autonomy as the session that handed off: Codex's own flag for "no approvals".
     launch: (root, prompt, input, dry) => cli('codex',
-      [...(input.permission_mode === 'bypassPermissions' ? ['--dangerously-bypass-approvals-and-sandbox'] : []), '-C', root, prompt], input, dry),
+      [...(input.permission_mode === 'bypassPermissions' && carryBypass() ? ['--dangerously-bypass-approvals-and-sandbox'] : []), '-C', root, prompt], input, dry),
     process: /^codex/i,
     // "codex exec" (alias "e"), "codex review", which runs the same way, and the codex-exec program: one prompt, and the
     // caller gets the last message of the turn. The TypeScript SDK runs one "codex exec" for each turn.
@@ -165,7 +165,7 @@ const ADAPTERS = {
     // "amp -x": it prints the final message and exits. Not when a program feeds it messages (--stream-json-input). Amp
     // documents nothing a plugin can ask, so the switch is looked for where the plugin runs and on what started that;
     // execute mode turned on by a redirected stdout alone has no switch to find.
-    oneShot: () => [process.pid, process.ppid].map(agentArgs).some((a) => a?.has('-x', '--execute') && !a.has('--stream-json-input')),
+    oneShot: () => [process.pid, process.ppid].map((pid) => agentArgs(pid)).some((a) => a?.has('-x', '--execute') && !a.has('--stream-json-input')),
     handoffBy: () => `Run the Driftless handoff with the driftless_handoff tool; if you do not have it, follow ${path.join(PLUGIN_ROOT, 'agents', 'handoff.md')} yourself. It needs:`,
     // No hook command: a plugin file Amp loads, which runs the core in-process (amp/driftless.js).
     install: {
@@ -195,7 +195,7 @@ const ADAPTERS = {
     // line. Plan mode is not carried over: the fresh session is there to do the next step. It starts in the folder it is
     // opened in.
     launch: (root, prompt, input, dry) => cli('qwen',
-      [...(['auto_edit', 'auto', 'yolo'].includes(input.permission_mode) ? ['--approval-mode', input.permission_mode.replace('_', '-')] : []), '-i', prompt], input, dry),
+      [...(['auto_edit', 'auto', 'yolo'].includes(input.permission_mode) ? ['--approval-mode', (input.permission_mode === 'yolo' && !carryBypass() ? 'auto_edit' : input.permission_mode).replace('_', '-')] : []), '-i', prompt], input, dry),
     process: /^(qwen|node)/i, // an npm program: its process is node
     // Headless as Qwen Code itself works it out (interactive-mode.ts and config.ts, 0.27.3): -p, or a prompt among the
     // arguments, and no -i. Not a program that feeds it its turns (--input-format stream-json, which its SDKs always
@@ -343,7 +343,7 @@ const ADAPTERS = {
     process: /^kiro/i,
     // Headless as its documentation gives it ("Headless mode" of its CLI): --no-interactive, the instruction as an
     // argument or piped in. Its hooks are loaded there since CLI 2.27.1, on its V3 harness.
-    oneShot: (input) => !!agentArgs(agentPid(input))?.has('--no-interactive'),
+    oneShot: (input) => !!agentArgs(agentPid(input), ['chat'])?.has('--no-interactive'),
     install: {
       // A hooks file of our own. With a folder: in that project, the only place its IDE is documented to read hooks from.
       // Without: in the user's Kiro folder, which its CLI V3 reads for every workspace.
@@ -454,6 +454,8 @@ const within = (dir, p, orSame = false) => {
   const rel = path.relative(dir, p);
   return rel === '' ? orSame : !path.isAbsolute(rel) && rel.split(/[\\/]/)[0] !== '..';
 };
+// Whether a name is there, a link that leads nowhere included.
+const taken = (p) => { try { fs.lstatSync(p); return true; } catch { return false; } };
 // What an in-process plugin saw (OpenCode, Kilo Code, Amp). The harness loads one file and calls it: nothing on its side
 // says whether it did, or whether what Driftless works from reaches the plugin. So the plugin writes down what it was
 // told, and "doctor" reads it:
@@ -1316,6 +1318,10 @@ function sessionName(root, title) {
 // and the mode it names can only make the fresh session stricter than the session that hands off, never looser: a
 // repository must not be able to give itself more than the user gave the session.
 const optionWord = (v) => (typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:@/[\]-]{0,119}$/.test(v) ? v : null);
+// Bypass reaches the fresh session only when the user asked for it (the plugin option carry_bypass, or
+// DRIFTLESS_CARRY_BYPASS where there is no plugin option): that session starts with nobody watching it. Without it, a
+// session in bypass hands off to one that edits without asking and asks before anything else (README, Safety).
+export const carryBypass = () => /^(true|1|yes|on)$/i.test(String(process.env.CLAUDE_PLUGIN_OPTION_CARRY_BYPASS || process.env.DRIFTLESS_CARRY_BYPASS || '').trim());
 const MODE_RANK = { plan: 0, dontAsk: 0, default: 1, acceptEdits: 2, auto: 3, bypassPermissions: 4 };
 export function freshMode(configured, inherited) {
   const mine = optionWord(inherited);
@@ -1335,7 +1341,8 @@ function launchClaude(root, prompt, input, dry) {
   // looser (README, Safety).
   // A config that does not read may be the one that held the sessions back: until it is fixed, the fresh session asks.
   const broken = config(root).broken;
-  const mode = freshMode(broken ? 'default' : config(root).permission_mode, input.permission_mode);
+  const chosen = freshMode(broken ? 'default' : config(root).permission_mode, input.permission_mode);
+  const mode = chosen === 'bypassPermissions' && !carryBypass() ? 'acceptEdits' : chosen;
   const modeArgs = mode && (mode !== 'default' || broken) ? ['--permission-mode', mode] : [];
   // Same model and effort too: without them the fresh session falls back to the user's default, which may
   // cost several times what the session that handed off was costing. A fresh start is also the one moment a
@@ -1471,8 +1478,8 @@ const FED_TURNS = /--input-format[=\s]+["']?stream-json/;
 //   fed       whether a program feeds it its turns (--input-format stream-json)
 // Linux keeps the arguments apart and Windows quotes them; "ps" on macOS gives the line alone, where the words of a
 // prompt cannot be told from switches: there only the head is searched, so a prompt that names a switch is not taken
-// for one.
-function agentArgs(pid) {
+// for one. A subcommand the row names (Kiro's "chat") is no prompt: the head goes on past it, to the switches after it.
+function agentArgs(pid, subcommands = []) {
   let args = null;
   let apart = true;
   try { args = fs.readFileSync(`/proc/${Number(pid)}/cmdline`, 'utf8').split('\0').filter(Boolean); } catch { /* not Linux */ }
@@ -1494,7 +1501,7 @@ function agentArgs(pid) {
   let prompt = null;
   for (let k = 0; k < rest.length && prompt === null; k++) {
     head.push(rest[k]);
-    if (!rest[k].startsWith('-') && !(k && rest[k - 1].startsWith('-') && !rest[k - 1].includes('='))) prompt = rest[k];
+    if (!rest[k].startsWith('-') && !(k && rest[k - 1].startsWith('-') && !rest[k - 1].includes('=')) && !subcommands.includes(rest[k])) prompt = rest[k];
   }
   const among = apart ? rest : head;
   return {
@@ -2406,9 +2413,11 @@ function init(folder) {
   const real = fs.realpathSync(root);
   for (const [key, file] of Object.entries(c.docs)) {
     const target = path.join(root, file);
-    // Written inside the project only: not into a folder that is a link out of it, nor through a link that leads nowhere
-    // ("wx" refuses any name that is there, a link included), as a clone can bring either.
-    if (fs.existsSync(target) || !within(real, fs.realpathSync(path.dirname(target)), true)) continue;
+    // Written inside the project only: not into a folder that is a link out of it, nor through a link that leads nowhere,
+    // as a clone can bring either. A name that is there, a link included, is left as it is: lstat sees a link that leads
+    // nowhere, where existsSync follows it and finds nothing. "wx" alone is not enough: on Windows it creates the file
+    // a dangling link leads to (seen on GitHub's runner, where links can be made).
+    if (taken(target) || !within(real, fs.realpathSync(path.dirname(target)), true)) continue;
     const tpl = fs.readFileSync(path.join(PLUGIN_ROOT, 'templates', DEFAULT_DOCS[key]), 'utf8');
     try { fs.writeFileSync(target, tpl.replaceAll('{{name}}', name).replaceAll('{{date}}', date), { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
   }
@@ -2518,7 +2527,7 @@ function install(harness, remove = false, folder = null, append = false) {
   const text = fs.readFileSync(path.join(PLUGIN_ROOT, 'agents', 'handoff.md'), 'utf8');
   const description = (text.match(/^description:\s*(.+)$/m) || [])[1] || 'Driftless handoff';
   writeText(t.agent, how.agent(description, text.replace(/^---[\s\S]*?---\s*/, '')));
-  if (!onPath('node')) console.log('Warning: node is not on PATH, and the hooks run "node". Install Node.js 18+ or fix PATH.');
+  if (!onPath('node')) console.log('Warning: node is not on PATH, and the hooks run "node". Install Node.js 20+ or fix PATH.');
   const missing = how.missing?.();
   if (missing) console.log(missing);
   console.log(`Driftless for ${harness} installed: hooks in ${t.hooks}, handoff agent in ${t.agent}.${(typeof how.then === 'function' ? how.then(folder) : how.then) || ''}` +

@@ -6,6 +6,9 @@
     "name": "Driftless contributors"
   },
   "license": "MIT",
+  "homepage": "https://github.com/Tigierre/driftless",
+  "repository": "https://github.com/Tigierre/driftless",
+  "keywords": ["context", "handoff", "context-rot", "session", "logbook", "agents-md"],
   "userConfig": {
     "token_cap": {
       "type": "number",
@@ -20,6 +23,12 @@
       "description": "Optional. Hand off at this percentage of the context window instead (e.g. 34). The window is inferred from the model; set context_window in .driftless/config.json to force it.",
       "min": 5,
       "max": 95
+    },
+    "carry_bypass": {
+      "type": "boolean",
+      "title": "Fresh session keeps bypass",
+      "description": "Off by default. When a session that runs with permissions bypassed hands off, the fresh session edits without asking and asks before anything else. Turn this on to let it bypass permissions too: it starts with nobody watching it.",
+      "default": false
     },
     "projects_root": {
       "type": "directory",

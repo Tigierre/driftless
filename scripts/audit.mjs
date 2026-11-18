@@ -5,6 +5,9 @@ import path from 'node:path';
 import { DEFAULTS, priceFor, ratesAt, resetCost, handoffPrice, restartTokens, guardAt, tokensFromChars } from './economy.mjs';
 
 const TAG = /<([a-zA-Z_-]+)[^>]*>[\s\S]*?<\/\1>/g;
+// A first prompt that picks up earlier work, in English and in Italian (the languages of the history the figures were
+// measured on; "cantiere" is Italian for the logbook): a piece of work that starts this way continues the one before it.
+// Changing the words changes how pieces of work are chained, so the published figures would change too.
 const RESUME = /resume|continue|logbook|cantiere|ripart|riprend|dove (siamo|eravamo)|avevamo lasciato/i;
 const FORCED = 950_000; // past this every policy has to do something: native compaction or a fresh start
 const TOO_BIG = 300_000; // the size past which a run is reported as out of bounds
