@@ -2,6 +2,7 @@
   "name": "driftless",
   "private": true,
   "type": "module",
+  "bin": { "driftless": "scripts/driftless.mjs" },
   "engines": { "node": ">=20" },
   "scripts": {
     "test": "node --test test/hooks.test.mjs"

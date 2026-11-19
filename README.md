@@ -4,15 +4,17 @@
 
 [![test](https://github.com/Tigierre/driftless/actions/workflows/test.yml/badge.svg)](https://github.com/Tigierre/driftless/actions/workflows/test.yml)
 
-**Hand off before the context rots — and never drift from what you set out to do.**
+**About 30% off the Claude Code bill on a real month of work: Driftless hands off before the context rots and reopens
+the project in a fresh session, by itself, without drifting from what you set out to do.**
 
 <img src="docs/handoff.gif" width="880" alt="A Claude Code session: the context climbs to 148k tokens; Driftless says a fresh start now costs less and asks for the handoff; the agent writes DESIGN.md and the resume point in LOGBOOK.md, never NORTHSTAR.md; a fresh session opens by itself and resumes from the resume point at 18k tokens.">
+<sub>An illustration drawn from Driftless' real messages; the numbers in it are an example.</sub>
 
 - **A changing of the guard, by itself.** When carrying the context costs more than a fresh start, the agent writes where
   things stand into the project's documents and the project reopens in a fresh session, which resumes from the resume
   point. No `/compact`, no `/clear`, nothing to type, no threshold to tune.
 - **27% to 31% off the whole bill, subagents included**, replayed on the author's own month of work. Every comparison,
-  the weak ones too, is in [What it saves](#what-it-saves); `audit` replays yours, locally, spending no tokens.
+  the weak ones too, is in [What it saves](#what-it-saves). One command replays yours, locally, spending no tokens.
 - **A Claude Code plugin**, with adapters for Codex, Cursor, OpenCode and seven more (only Claude Code is tried live:
   [help wanted](#help-wanted)). No server, no dependencies, nothing sent anywhere. Needs Node.js 20 or later.
 
@@ -21,7 +23,12 @@
 /plugin install driftless@driftless
 ```
 
-<sub>The animation is an illustration drawn from Driftless' real messages; the numbers in it are an example.</sub>
+Not sure yet? See first what it would have saved you on your own Claude Code history, without installing the plugin.
+From a project folder you have worked in with Claude Code (`--all` for every project on this machine):
+
+```
+npx github:Tigierre/driftless audit
+```
 
 Every project lives in three documents with distinct jobs:
 
@@ -30,6 +37,23 @@ Every project lives in three documents with distinct jobs:
 | `NORTHSTAR.md` | The goal, in your words: why, how you'll know, what you don't want | Only you |
 | `DESIGN.md` | Durable source of truth, by topic, kept as-is, with an index at the top | The agent, at every handoff |
 | `LOGBOOK.md` | Last 3 tasks in detail, older ones one line each, and the **Resume point** | The agent, while working |
+
+## Why not `/compact`?
+
+- **Where the memory lives.** `/compact` and auto-compact have the model summarize the conversation inside that one
+  conversation; you don't choose what it keeps. A Driftless handoff writes where things stand into files in your project
+  (`DESIGN.md` by topic, the resume point in `LOGBOOK.md`) that you can read, fix and commit, and that the next session,
+  tomorrow's or another tool's, starts from.
+- **The goal does not drift.** Summaries of summaries lose the why. `NORTHSTAR.md` is never rewritten by the agent: every
+  session starts from your own words.
+- **When.** Auto-compact steps in when the window is nearly full, when every request is at its most expensive. Driftless
+  hands off when carrying the context has cost more than a fresh start would, so the moment is set by price, not by a
+  fixed percentage.
+- **`/clear` without forgetting.** A fresh session is cheap; losing what you did not write down is not. Driftless writes
+  it down first, then opens the fresh session for you.
+
+It does not claim to beat a well-timed manual `/compact` in dollars: [What it saves](#what-it-saves) compares with never
+resetting, and against careful manual handoffs the gain is 3.5%. What it takes off you is watching the meter.
 
 ## Install
 
@@ -172,13 +196,15 @@ gives the 27% to 31% above; the rest of the way was studied and no lever left at
 
 ### Ask your own history
 
-In Claude Code, ask the agent: "does Driftless pay off here?", or "on all my projects?". From a clone, in the project's
-folder:
+In Claude Code, ask the agent: "does Driftless pay off here?", or "on all my projects?". Without installing anything,
+in the project's folder (Node.js 20+):
 
 ```
-node <clone>/scripts/driftless.mjs audit           # this project (Claude Code transcripts)
-node <clone>/scripts/driftless.mjs audit --all     # every project on this machine
+npx github:Tigierre/driftless audit           # this project (Claude Code transcripts)
+npx github:Tigierre/driftless audit --all     # every project on this machine
 ```
+
+From a clone, `node <clone>/scripts/driftless.mjs audit` does the same.
 
 `audit` replays your sessions under each policy at today's list prices and says what each would have cost, with a 95%
 interval. It spends no tokens and sends nothing anywhere. **On short sessions it will tell you Driftless does not save

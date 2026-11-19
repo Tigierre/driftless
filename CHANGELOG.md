@@ -4,6 +4,9 @@
 
 - **README:** a shorter opening (three points and the install commands) under an animation of the handoff, drawn from
   Driftless' real messages (`docs/handoff.gif`).
+- **`npx github:Tigierre/driftless audit`:** see what Driftless would have saved on your own Claude Code history
+  without installing the plugin (`package.json` gains a `bin`).
+- **README:** a first line that says what it saves, and a "Why not `/compact`?" section.
 
 ## 0.1.0 — 2026-11-18
 
