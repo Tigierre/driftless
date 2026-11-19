@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **README:** a shorter opening (three points and the install commands) under an animation of the handoff, drawn from
+  Driftless' real messages (`docs/handoff.gif`).
+
 ## 0.1.0 — 2026-11-18
 
 First public release.

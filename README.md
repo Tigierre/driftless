@@ -6,18 +6,24 @@
 
 **Hand off before the context rots — and never drift from what you set out to do.**
 
-**Watch** the context → **hand off** when carrying it costs more than a fresh start → **write down** where things stand →
-**reopen** the project in a fresh session → **resume** from the resume point. By itself, then round again.
+<img src="docs/handoff.gif" width="880" alt="A Claude Code session: the context climbs to 148k tokens; Driftless says a fresh start now costs less and asks for the handoff; the agent writes DESIGN.md and the resume point in LOGBOOK.md, never NORTHSTAR.md; a fresh session opens by itself and resumes from the resume point at 18k tokens.">
 
-**27% to 31% off the whole bill, subagents included**, replayed on the author's own month of work against carrying each
-piece of work in one session to the end. Every comparison, the weak ones too, is in [What it saves](#what-it-saves).
+- **A changing of the guard, by itself.** When carrying the context costs more than a fresh start, the agent writes where
+  things stand into the project's documents and the project reopens in a fresh session, which resumes from the resume
+  point. No `/compact`, no `/clear`, nothing to type, no threshold to tune.
+- **27% to 31% off the whole bill, subagents included**, replayed on the author's own month of work. Every comparison,
+  the weak ones too, is in [What it saves](#what-it-saves); `audit` replays yours, locally, spending no tokens.
+- **A Claude Code plugin**, with adapters for Codex, Cursor, OpenCode and seven more (only Claude Code is tried live:
+  [help wanted](#help-wanted)). No server, no dependencies, nothing sent anywhere. Needs Node.js 20 or later.
 
-For **Claude Code, Codex, Cursor, OpenCode, Kilo Code, Amp, Qwen Code, Gemini CLI, Copilot CLI, Devin and Kiro**, and, without the
-automation, for any agent that reads `AGENTS.md` (only Claude Code is tried live: [help wanted](#help-wanted)). Every project lives in
-three documents with distinct jobs, and when carrying a session's context costs more than a fresh start, Driftless
-distills the session into those documents and reopens the project in a fresh session by itself. No compaction, no
-`/clear`, nothing to type when it is time to hand off, no threshold to tune. Each tool needs one setup step, once (see
-[Install](#install), which also says what each tool gets).
+```
+/plugin marketplace add Tigierre/driftless
+/plugin install driftless@driftless
+```
+
+<sub>The animation is an illustration drawn from Driftless' real messages; the numbers in it are an example.</sub>
+
+Every project lives in three documents with distinct jobs:
 
 | Document | Job | Who changes it |
 |---|---|---|
