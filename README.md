@@ -130,7 +130,9 @@ its limits: [Install, tool by tool](docs/install.md).
 ## How it works
 
 1. **Start.** In a folder that isn't a project, Driftless asks: new project, resume one, or just work here.
-   A new project gets its folder, the three documents and a North Star interview.
+   A new project gets its folder, the three documents and a North Star interview. A folder that already keeps
+   documents like them (a vision, a spec, handoff notes) keeps them: Driftless creates only what is missing, and asks
+   you, for each one found, to keep it as it is or have it rewritten from scratch.
 2. **Work.** Every session starts with the goal, the resume point and the design index already in
    context — and reads only the design sections it needs.
 3. **Time to hand off.** Driftless keeps the account of what carrying the context has cost ([the rule](docs/how-it-works.md)). When
@@ -160,9 +162,12 @@ has cost as much as a fresh start. To set your own limit, in `.driftless/config.
 
 | Option | Example | Meaning |
 |---|---|---|
-| `token_cap` | `250000` | Hand off at this many tokens. |
+| `token_cap` | `340000` | Hand off at this many tokens. |
 | `cap_percent` | `34` | Hand off at this share of the model's context window. |
-| both | `34` + `250000` | The lower of the two wins: the token cap is an absolute ceiling. |
+| both | `34` + `340000` | The lower of the two wins: the token cap is an absolute ceiling. |
+
+Or just ask the agent for a cap: it offers **260k, 340k or 400k** and runs `cap 340k` (`cap auto` goes back to the rule).
+No cap goes past **400,000 tokens**, whatever a config or a percentage of a 1M window says.
 
 In Claude Code a status line shows where the session stands, so you never need `/context`:
 

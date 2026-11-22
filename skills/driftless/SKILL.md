@@ -18,6 +18,14 @@ with the path in double quotes: that form, and only that one, runs without a per
   one sentence, why, how they will know it is reached, non-negotiables, what they do not want),
   write it, have them confirm it, set the logbook's Resume point to the first concrete step toward the
   goal, then `node "<script>" open "<folder>"` (the fresh session keeps this session's permission mode).
+- A folder that already has documents like these (a goal or vision, a design doc or spec, a logbook or handoff notes):
+  `init` analyses them first, creates only the missing ones and writes over none. Follow what it prints: read each
+  document found, say what it holds, and ask the user, for each, to keep it as it is or have Driftless rewrite it from
+  scratch with its template (`docs "<folder>" keep|rewrite <part> "<file>"`; `docs "<folder>" new <part>` if the file is
+  not that kind of document). A goal kept needs only the user's confirmation, not the interview. `docs "<folder>"` shows them.
+- Cap (where the handoff comes, in tokens): when a project is created, and whenever the user asks, offer automatic (the
+  default: a handoff when a fresh start costs less than carrying on, by 260k at the latest) or a fixed cap of 260k, 340k
+  or 400k (the most Driftless allows): `node "<script>" cap 260k|340k|400k "<folder>"`, `cap auto` to go back, `cap` to show it.
 - Resume / open a project in a fresh window: `node "<script>" open "<folder>"`.
 - Work on a project from this window, though it was opened elsewhere (an editor open on the folder above, or on another
   one): `node "<script>" attach "<folder>"`, then follow what it prints. Every hook of this session then works on that project.

@@ -84,6 +84,95 @@ test('init does not overwrite existing documents', () => {
   assert.equal(fs.readFileSync(path.join(root, 'DESIGN.md'), 'utf8'), 'mine');
 });
 
+// A folder with documents of its own: init analyses them, creates only what is missing, rewrites none, and asks.
+const ownDocs = (s, name = 'own') => {
+  const root = path.join(s.home, 'work', name);
+  fs.mkdirSync(path.join(root, 'docs'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'FARO_own.md'), '# FARO — own\n\n## 🎯 Il desiderato\nMY-GOAL\n');
+  fs.writeFileSync(path.join(root, 'CANTIERE.md'), '# Cantiere\n\n## 📍 Punto di ripartenza\n- MY-NEXT-STEP\n');
+  fs.writeFileSync(path.join(root, 'DESIGN_SYSTEM.md'), '# Design system\ncolours\n');
+  fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Design\nmy rules\n');
+  fs.writeFileSync(path.join(root, 'README.md'), '## Resume point\n');
+  return root;
+};
+
+test('init in a folder with documents of its own: analyses them, creates only what is missing, writes over none', () => {
+  const s = sandbox();
+  const root = ownDocs(s);
+  const out = s.run(['init', root]).stdout;
+  assert.equal(fs.readFileSync(path.join(root, 'FARO_own.md'), 'utf8'), '# FARO — own\n\n## 🎯 Il desiderato\nMY-GOAL\n');
+  assert.match(fs.readFileSync(path.join(root, 'CANTIERE.md'), 'utf8'), /MY-NEXT-STEP/);
+  for (const f of ['NORTHSTAR.md', 'LOGBOOK.md']) assert.ok(!fs.existsSync(path.join(root, f)), `${f} is not created next to the one found`);
+  assert.ok(fs.existsSync(path.join(root, 'DESIGN.md')), 'the part nothing plays is created');
+  const c = s.read(root, '.driftless', 'config.json');
+  assert.deepEqual(c.docs, { goal: 'FARO_own.md', design: 'DESIGN.md', log: 'CANTIERE.md' });
+  assert.deepEqual(c.pending_docs, ['goal', 'log']);
+  assert.match(out, /Created from Driftless' templates: DESIGN\.md/);
+  assert.match(out, /FARO_own\.md \(\d+ bytes, 5 lines, changed [\d-]+; sections: Il desiderato\), found by its name and what it holds/);
+  assert.match(out, /CANTIERE\.md .*has a Resume point/);
+  assert.match(out, /KEEP it[\s\S]*REWRITE it[\s\S]*docs ".*" keep <part>[\s\S]*docs ".*" rewrite <part>/);
+  assert.doesNotMatch(out, /CLAUDE\.md|README\.md|DESIGN_SYSTEM\.md/, 'the user\'s instructions, a README and a design system are never one of them');
+  assert.match(out, /Cap: automatic/);
+  // Until the user has chosen, every session start asks; it starts from the documents found.
+  const ctx = () => s.run(['session-start'], { cwd: root, session_id: `s${Math.random()}` }).json.hookSpecificOutput.additionalContext;
+  const first = ctx();
+  assert.match(first, /found documents already in .*: FARO_own\.md as the goal; CANTIERE\.md as the logbook/);
+  assert.match(first, /MY-GOAL[\s\S]*MY-NEXT-STEP/);
+  // A project already: init again asks nothing new and writes nothing.
+  s.run(['init', root]);
+  assert.deepEqual(s.read(root, '.driftless', 'config.json').pending_docs, ['goal', 'log']);
+});
+
+test('docs keep, rewrite and new: the user\'s answer about each document found', () => {
+  const s = sandbox();
+  const root = ownDocs(s);
+  s.run(['init', root]);
+  assert.match(s.run(['docs', root, 'keep', 'goal', 'FARO_own.md']).stdout, /keeps FARO_own\.md as the goal/);
+  assert.match(fs.readFileSync(path.join(root, 'FARO_own.md'), 'utf8'), /MY-GOAL/);
+  assert.deepEqual(s.read(root, '.driftless', 'config.json').pending_docs, ['log']);
+  const r = s.run(['docs', root, 'rewrite', 'log', 'CANTIERE.md']).stdout;
+  assert.match(fs.readFileSync(path.join(root, 'CANTIERE.md'), 'utf8'), /^# Logbook — own/);
+  const copies = fs.readdirSync(path.join(root, '.driftless', 'replaced'));
+  assert.equal(copies.length, 1);
+  assert.match(fs.readFileSync(path.join(root, '.driftless', 'replaced', copies[0]), 'utf8'), /MY-NEXT-STEP/, 'the old text is kept');
+  assert.match(r, /rewrote CANTIERE\.md from scratch/);
+  const c = s.read(root, '.driftless', 'config.json');
+  assert.equal(c.pending_docs, undefined, 'all chosen: nothing asked any more');
+  assert.doesNotMatch(s.run(['session-start'], { cwd: root, session_id: 's9' }).json.hookSpecificOutput.additionalContext, /found documents already/);
+  // Refused: a file outside the project, one already playing another part, a part that is not one, a name already there.
+  assert.equal(s.run(['docs', root, 'keep', 'design', '../x.md']).status, 1);
+  assert.match(s.run(['docs', root, 'keep', 'design', 'CANTIERE.md']).stdout, /already the logbook/);
+  assert.equal(s.run(['docs', root, 'keep', 'readme', 'README.md']).status, 1);
+  assert.match(s.run(['docs', root, 'new', 'design']).stdout, /DESIGN\.md is already there/);
+  // "new": Driftless' own document, and the one found left alone.
+  const other = ownDocs(s, 'other');
+  s.run(['init', other]);
+  assert.match(s.run(['docs', other, 'new', 'goal']).stdout, /created NORTHSTAR\.md as the goal; FARO_own\.md stays as it is/);
+  assert.match(fs.readFileSync(path.join(other, 'FARO_own.md'), 'utf8'), /MY-GOAL/);
+  assert.equal(s.read(other, '.driftless', 'config.json').docs.goal, 'NORTHSTAR.md');
+  assert.match(s.run(['docs', other]).stdout, /- log: CANTIERE\.md .* found by init, the user has not chosen yet/);
+});
+
+test('a document that is a link is never adopted nor rewritten', (t) => {
+  const s = sandbox();
+  const root = path.join(s.home, 'work', 'linked');
+  fs.mkdirSync(root, { recursive: true });
+  const outside = path.join(s.home, 'secret.md');
+  fs.writeFileSync(outside, '## Resume point\nSECRET\n');
+  try { fs.symlinkSync(outside, path.join(root, 'LOGBOOK-old.md')); } catch { return t.skip('no links on this machine'); }
+  s.run(['init', root]);
+  assert.equal(s.read(root, '.driftless', 'config.json').docs.log, 'LOGBOOK.md');
+  assert.equal(s.run(['docs', root, 'rewrite', 'log', 'LOGBOOK-old.md']).status, 1);
+  assert.match(fs.readFileSync(outside, 'utf8'), /SECRET/);
+});
+
+test('a session started in a folder with documents of its own suggests making it the project', () => {
+  const s = sandbox();
+  const root = ownDocs(s, 'loose');
+  const ctx = s.run(['session-start'], { cwd: root, session_id: 's1' }).json.hookSpecificOutput.additionalContext;
+  assert.match(ctx, /Make THIS folder the project: .*FARO_own\.md as the goal, CANTIERE\.md as the logbook/);
+});
+
 test('session-start outside a project asks new / resume / ignore', () => {
   const s = sandbox();
   const known = s.project('gamma');
@@ -1155,6 +1244,40 @@ test('a context already past 200k means a 1M window, whatever the model id says'
 test('with both a percentage and a token cap, the lower wins', () => {
   const s = sandbox();
   assert.equal(stopAt(s, { cap_percent: 34, token_cap: 100_000 }, [20_000, 120_000], 'claude-opus-5-5').decision, 'block');
+});
+
+test('no cap goes past 400k: not a token cap written by hand, not a percentage of a 1M window', () => {
+  const s = sandbox();
+  assert.equal(stopAt(s, { token_cap: 900_000 }, [40_000, 390_000], 'claude-opus-5-5'), null);
+  assert.equal(stopAt(s, { token_cap: 900_000 }, [40_000, 401_000], 'claude-opus-5-5').decision, 'block');
+  assert.equal(stopAt(s, { cap_percent: 95 }, [40_000, 401_000], 'claude-opus-5-5').decision, 'block');
+  assert.equal(stopAt(s, {}, [40_000, 401_000], 'claude-opus-5-5', { CLAUDE_PLUGIN_OPTION_TOKEN_CAP: '800000' }).decision, 'block');
+  assert.equal(s.read(s.project('ceil', { token_cap: 900_000 }), '.driftless', 'config.json').token_cap, 900_000, 'the config stays the user\'s');
+  assert.equal(JSON.parse(s.run(['status', s.project('ceil2', { token_cap: 900_000 })]).stdout).cap, 400_000);
+});
+
+test('cap: the user picks 260k, 340k or 400k, or the economic rule', () => {
+  const s = sandbox();
+  const root = s.project('pick', { cap_percent: 34 });
+  const cfg = () => s.read(root, '.driftless', 'config.json');
+  assert.match(s.run(['cap', root]).stdout, /Cap in .*: 68,000 tokens \(34% of the context window\)[\s\S]*cap 260k · cap 340k · cap 400k/);
+  assert.match(s.run(['cap', '260k', root]).stdout, /260,000 tokens \(token_cap in .*\); it replaces the 34% cap/);
+  assert.equal(cfg().token_cap, 260_000);
+  assert.equal(cfg().cap_percent, undefined);
+  for (const v of ['340', '400000', '400K']) assert.equal(s.run(['cap', v, root]).status, 0, v);
+  assert.equal(cfg().token_cap, 400_000);
+  for (const v of ['500k', '300k', '0.1k']) {
+    assert.equal(s.run(['cap', v, root]).status, 1, v);
+    assert.equal(cfg().token_cap, 400_000, `${v} changes nothing`);
+  }
+  assert.match(s.run(['cap', '500k', root]).stdout, /400,000 is the most/);
+  assert.match(s.run(['cap', 'auto', root]).stdout, /automatic/);
+  assert.equal(cfg().token_cap, undefined);
+  assert.match(s.run(['cap', 'auto', root], undefined, { CLAUDE_PLUGIN_OPTION_TOKEN_CAP: '340000' }).stdout, /plugin's own setting \(340,000 tokens\) still applies/);
+  // From the next answer: the stop reads the config the command wrote.
+  s.run(['cap', '260k', root]);
+  s.run(['session-start'], { cwd: root, session_id: 'c1' });
+  assert.equal(s.run(['stop'], { cwd: root, session_id: 'c1', transcript_path: s.transcript('cap', [40_000, 265_000], 'claude-opus-5-5') }).json.decision, 'block');
 });
 
 test('the 1M opt-out and an explicit window are honoured', () => {
@@ -2992,7 +3115,8 @@ test('a turn that ends past the guard hands off there, even if the rule has not 
 
 test('a cap the user chose moves the guard, up or down', () => {
   const s = sandbox();
-  assert.equal(guarded(s, { token_cap: 900_000 }).step(400_000).stdout, '');
+  assert.equal(guarded(s, { token_cap: 340_000 }).step(330_000).stdout, '', 'up, past the 260k default');
+  assert.match(said(guarded(s, { token_cap: 900_000 }).step(401_000)), /past the guard at 400,000/, 'never past 400k');
   assert.match(said(guarded(s, { token_cap: 100_000 }).step(101_000, {}, 20_000)), /Finish only the step in progress/);
   const g = guarded(s, { cap_percent: 34 });
   assert.equal(g.step(300_000).stdout, '');

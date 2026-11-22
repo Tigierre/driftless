@@ -4,7 +4,7 @@
 //   --harness claude|codex|cursor|opencode|kilo|amp|qwen|gemini|copilot|devin|kiro    which agent runs the hook (default claude)
 //   no hooks: begin [folder] | step [folder]   run by the agent itself, told by the project's AGENTS.md (install generic);
 //             "step" also where the hooks run but nothing says the size of the context (Devin, Kiro)
-//   commands: init <folder> | open <folder> | attach <folder> [session] | link <project> [folder] | unlink [folder] | ignore <folder> | status [folder] | audit [--all] [--json] | diet [keep <name> | auto on|off | apply <items> | undo] | install|uninstall <harness> [folder] [--append] | doctor <harness> [folder]
+//   commands: init <folder> | docs <folder> [keep|rewrite <part> <file> | new <part>] | cap [260k|340k|400k|auto] [folder] | open <folder> | attach <folder> [session] | link <project> [folder] | unlink [folder] | ignore <folder> | status [folder] | audit [--all] [--json] | diet [keep <name> | auto on|off | apply <items> | undo] | install|uninstall <harness> [folder] [--append] | doctor <harness> [folder]
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -692,14 +692,22 @@ const capPercent = (c) => {
   const n = Number(String(c.cap_percent || process.env.CLAUDE_PLUGIN_OPTION_CAP_PERCENT || process.env.DRIFTLESS_CAP_PERCENT || '').replace('%', ''));
   return n > 0 ? Math.min(n, 100) : null;
 };
-// A cap the user chose: tokens, a percentage of the window, or both (the lower wins). Null: the economic rule decides.
+// The caps offered to the user ("cap 260k|340k|400k"), and the most any cap can be, whatever a config or a percentage of a
+// 1M window says: past it the context is where answers go stale. A number written by hand in config.json still counts, up
+// to that ceiling; without a cap the economic rule hands off by itself, by the guard at 260,000 at the latest.
+const CAP_CHOICES = [260_000, 340_000, 400_000];
+const MAX_TOKEN_CAP = 400_000;
+// The plugin's own setting (userConfig) and the environment, under the project's config.json.
+const settingCap = () => Number(process.env.CLAUDE_PLUGIN_OPTION_TOKEN_CAP || process.env.DRIFTLESS_TOKEN_CAP) || null;
+// A cap the user chose: tokens, a percentage of the window, or both (the lower wins), never past MAX_TOKEN_CAP. Null: the
+// economic rule decides.
 function explicitCap(root, m) {
   const c = config(root);
-  const tokens = Number(c.token_cap || process.env.CLAUDE_PLUGIN_OPTION_TOKEN_CAP || process.env.DRIFTLESS_TOKEN_CAP) || null;
+  const n = Number(c.token_cap) || settingCap();
+  const tokens = n > 0 ? n : null;
   const pct = capPercent(c);
-  if (!pct) return tokens;
-  const fromPct = Math.round(contextWindow(root, m) * pct / 100);
-  return tokens ? Math.min(tokens, fromPct) : fromPct;
+  const cap = !pct ? tokens : Math.min(tokens || Infinity, Math.round(contextWindow(root, m) * pct / 100));
+  return cap ? Math.min(cap, MAX_TOKEN_CAP) : null;
 }
 // Without a request-by-request ledger: the threshold the prices imply; an unknown model gets the plain default.
 function economicCap(root, m, model) {
@@ -1660,9 +1668,11 @@ function startOn(root, input) {
 function startText(root, sessionId, { lost = null, note = null, hand = null, single = false } = {}) {
   const c = config(root);
   const pct = capPercent(c);
-  const capText = pct ? `at ${pct}% of the context window`
-    : explicitCap(root) ? `at ${explicitCap(root).toLocaleString('en')} tokens`
+  const cap = explicitCap(root);
+  const capText = pct ? `at ${pct}% of the context window${cap === MAX_TOKEN_CAP ? ` (${MAX_TOKEN_CAP.toLocaleString('en')} tokens at most)` : ''}`
+    : cap ? `at ${cap.toLocaleString('en')} tokens`
     : 'when carrying the context costs more than a fresh start';
+  const pend = pendingDocs(c);
   return [
     `Driftless project "${c.name || path.basename(root)}" in ${root}.`,
     `- ${c.docs.goal}: the user's goal. Never edit it unless the user explicitly asks; flag any drift from it before acting.`,
@@ -1684,6 +1694,7 @@ function startText(root, sessionId, { lost = null, note = null, hand = null, sin
       `If the user asks to stop Driftless: ${nodeCommand()} off (here) or off --global (everywhere); on undoes it.`,
     ...(c.broken ? [`Tell the user: ${dl(root, 'config.json')} does not read as JSON, so none of its settings apply (cap, documents, permission mode: ` +
       'a fresh session asks for permissions), and Driftless will not write to it until it is fixed.'] : []),
+    ...(pend.length ? [pendingText(root, c, pend)] : []),
     ...(lost ? [lost] : []),
     '', '--- GOAL ---', readDoc(root, c.docs.goal, 3000),
     '', '--- RESUME POINT ---', section(root, c.docs.log, RESUME_HEADINGS, 3000, '(no resume point yet)'),
@@ -1795,12 +1806,19 @@ function newOrResume(cwd, sid) {
   const known = registry().filter((p) => fs.existsSync(p.path)).sort((a, b) => inside(b) - inside(a)).slice(0, 12);
   const rootDir = process.env.CLAUDE_PLUGIN_OPTION_PROJECTS_ROOT || (known[0] && path.dirname(known[0].path)) || '';
   const node = nodeCommand();
+  // A folder that already keeps documents of its own like Driftless' is likely the project itself.
+  let here = {};
+  try { here = findDocs(cwd); } catch { /* a folder that cannot be read: nothing to suggest */ }
   return context('SessionStart', [
     `Driftless: this folder (${cwd}) is not a Driftless project. Before anything else, ask the user${adapter().askWith || ''} which they want:`,
+    ...(Object.keys(here).length ? [`0. Make THIS folder the project: it already holds documents like Driftless' own (${Object.values(here).map((f) => `${f.rel} as ${DOC_ROLES[f.part].words}`).join(', ')}). ` +
+      `Run: ${node} init "${cwd}". It rewrites none of them and says what to ask the user about each.`] : []),
     `1. Start a NEW project. Ask its name${rootDir ? ` (it will be created in ${rootDir})` : ' and where to create it'}. Run: ${node} init "<folder>". ` +
       'Then interview the user for the goal document in their own words (what they want, why, how they will know it is reached, ' +
       `constraints, what they do not want), write it, have them confirm it, set the Resume point of the logbook to the first concrete step toward the goal, ` +
+      `and ask where the handoff should come: automatic (the default) or a cap of 260k, 340k or 400k tokens (${node} cap 340k "<folder>"); ` +
       `then run: ${node} open "<folder>" so the work continues there in a fresh session. ` +
+      'If init lists documents it found already there, follow what it prints before the interview. ' +
       'If init says the folder is not trusted yet, tell the user before opening: the new window will ask once, and trusting the parent folder once avoids it for every future project.',
     `2. RESUME a project${known.length ? ': ' + known.map((p) => `${plainText(p.name, 60) || path.basename(p.path)} (${p.path})`).join('; ') : ' (none registered yet: ask for its folder)'}. ` +
       `To work on it from this window, run: ${node} attach "<folder>"${sid ? ` ${sid}` : ''}, then follow what it prints. ` +
@@ -1948,7 +1966,7 @@ function stop(input) {
   }
   if (!ruled && tooClose(m, limit)) {
     writeJson(stateFile, { ...keep, last_tokens: m.last });
-    return emit({ systemMessage: `Driftless: the cap (${limit}) is too close to this setup's starting context (${m.first} tokens). Raise token_cap in .driftless/config.json${can('settings') ? ', or ask the agent what the diet would hide' : ''}.` });
+    return emit({ systemMessage: `Driftless: the cap (${limit}) is too close to this setup's starting context (${m.first} tokens). Raise it (${CAP_CHOICES.map((n) => `cap ${n / 1000}k`).join(', ')})${can('settings') ? ', or ask the agent what the diet would hide' : ''}.` });
   }
   if (planMode(input)) return planNote(stateFile, keep, { last_tokens: m.last });
   if (oneShot(root, keep, input)) { writeJson(stateFile, { ...keep, one_shot: true, last_tokens: m.last }); return; } // asked nothing: see oneShot
@@ -2402,32 +2420,231 @@ function handoffRequest(root, m, why, input) {
   ].join('\n');
 }
 
+// ---------- documents a folder already has ----------
+// A folder can already hold documents that play the part of Driftless' three: a goal or a vision, a design doc or a spec,
+// a logbook or handoff notes. Before writing anything, init looks for them (in the folder and in its docs/), by their name
+// or by what they say of themselves, and writes over none of them: each one found is the project's document as it is
+// until the user chooses to keep it or to have it rewritten from scratch ("docs"). Only the parts nothing plays are created.
+// What the user wrote to tell the agents how to work (CLAUDE.md, AGENTS.md...) and a repository's usual files are never one.
+const DOC_ROLES = {
+  goal: { words: 'the goal', name: /^(north[ _-]?star|faro|vision|visione|goals?|mission|obiettiv[oi])([ _.-]|$)/i,
+    says: /^#{1,3}\s.*(north star|il desiderato|\bfaro\b)/i },
+  design: { words: 'the design doc', name: /^(design|progettazione|architecture|architettura|specs?|specification|specifica|specifiche)([ _.-]|$)/i,
+    not: /design[ _-]?system/i, says: /^#\s.*\b(design|progettazione|architecture|architettura)\b|source of truth|fonte di verit/i },
+  log: { words: 'the logbook', name: /^(logbook|cantiere|handoff|progress|devlog|dev[ _-]log|journal|worklog|diario)([ _.-]|$)/i,
+    says: /^##\s.*(resume point|punto di ripartenza)|^#\s.*\b(logbook|cantiere|devlog)\b/i },
+};
+const NOT_DOCS = /^(readme|claude|agents|gemini|copilot-instructions|changelog|changes|history|license|licence|contributing|security|code_of_conduct|copying|notice|authors|support)([ _.-]|$)/i;
+const DOC_SCAN_MAX = 60; // Markdown files looked at, at most, in a folder and in its docs/
+const DOC_READ_MAX = 256 * 1024;
+const pendingDocs = (c) => (Array.isArray(c.pending_docs) ? c.pending_docs.filter((k) => Object.hasOwn(DEFAULT_DOCS, k)) : []);
+const relName = (rel) => rel.replace(/\\/g, '/');
+// A plain file of the folder: never a link (a clone can bring one that leads out of it), never outside the folder.
+const plainFileIn = (root, rel) => {
+  const abs = path.join(root, rel);
+  try { return fs.lstatSync(abs).isFile() && within(fs.realpathSync(root), fs.realpathSync(path.dirname(abs)), true) ? abs : null; } catch { return null; }
+};
+const readSome = (abs) => {
+  const fd = fs.openSync(abs, 'r');
+  try { const b = Buffer.alloc(Math.min(fs.fstatSync(fd).size, DOC_READ_MAX)); fs.readSync(fd, b, 0, b.length, 0); return b.toString('utf8'); } finally { fs.closeSync(fd); }
+};
+// What a document is, in one line the agent can repeat to the user: size, lines, when it changed, what it holds.
+function docSummary(root, rel) {
+  const abs = path.join(root, rel);
+  let st, text = '';
+  try { st = fs.statSync(abs); text = readSome(abs); } catch { return `${rel} (cannot be read)`; }
+  const lines = text.split(/\r?\n/);
+  const heads = lines.filter((l) => /^##\s/.test(l)).map((l) => plainText(l.replace(/^#+\s*/, ''), 40)).filter(Boolean);
+  const marks = [lines.some((l) => RESUME_HEADINGS.test(l)) && 'a Resume point', lines.some((l) => INDEX_HEADINGS.test(l)) && 'an Index'].filter(Boolean);
+  return `${rel} (${st.size < 1024 ? `${st.size} bytes` : `${(st.size / 1024).toFixed(1)} KB`}, ${st.size > DOC_READ_MAX ? 'over ' : ''}${lines.length} lines, changed ${st.mtime.toISOString().slice(0, 10)}` +
+    `${marks.length ? `, has ${marks.join(' and ')}` : ''}${heads.length ? `; sections: ${heads.slice(0, 6).join(' · ')}${heads.length > 6 ? ` · +${heads.length - 6}` : ''}` : ''})`;
+}
+// The documents of the folder that look like each part, best first: Driftless' own name, then name and content, then
+// either. One file plays one part at most; `skip` are files already playing one.
+function findDocs(root, parts = Object.keys(DEFAULT_DOCS), skip = []) {
+  const seen = [];
+  let looked = 0;
+  for (const dir of ['', 'docs']) {
+    let names = [];
+    try { names = fs.readdirSync(path.join(root, dir)).filter((n) => /\.(md|markdown)$/i.test(n)).sort(); } catch { continue; }
+    for (const n of names) {
+      const rel = relName(path.join(dir, n));
+      const stem = n.replace(/\.(md|markdown)$/i, '');
+      if (NOT_DOCS.test(stem) || skip.includes(rel) || !plainFileIn(root, rel)) continue;
+      if (++looked > DOC_SCAN_MAX) break;
+      let lines = [];
+      try { lines = readSome(path.join(root, rel)).split(/\r?\n/); } catch { continue; }
+      const mtime = fs.statSync(path.join(root, rel)).mtimeMs;
+      for (const part of parts) {
+        const r = DOC_ROLES[part];
+        if (r.not?.test(stem)) continue;
+        const byName = r.name.test(stem);
+        const says = lines.some((l) => r.says.test(l));
+        const score = rel === DEFAULT_DOCS[part] ? 4 : (byName ? 2 : 0) + (says ? 1 : 0);
+        if (score) seen.push({ part, rel, score, mtime, why: score === 4 ? 'Driftless\' own name' : [byName && 'its name', says && 'what it holds'].filter(Boolean).join(' and ') });
+      }
+    }
+  }
+  seen.sort((a, b) => b.score - a.score || b.mtime - a.mtime);
+  const picked = {};
+  const used = new Set();
+  for (const s of seen) if (!picked[s.part] && !used.has(s.rel)) { picked[s.part] = s; used.add(s.rel); }
+  const found = Object.fromEntries(parts.filter((k) => picked[k]).map((k) => [k, picked[k]]));
+  for (const [part, f] of Object.entries(found)) f.others = [...new Set(seen.filter((s) => s.part === part && !used.has(s.rel)).map((s) => s.rel))];
+  return found;
+}
+// A document from Driftless' template, written only inside the project and never over a name that is there.
+function writeTemplate(root, part, file, { over = false } = {}) {
+  const target = path.join(root, file);
+  // Not into a folder that is a link out of the project, nor through a link that leads nowhere, as a clone can bring
+  // either. A name that is there, a link included, is left as it is: lstat sees a link that leads nowhere, where
+  // existsSync follows it and finds nothing. "wx" alone is not enough: on Windows it creates the file a dangling link
+  // leads to (seen on GitHub's runner, where links can be made). Over a document only when the user chose it ("rewrite").
+  if (over ? !plainFileIn(root, file) : taken(target) || !within(fs.realpathSync(root), fs.realpathSync(path.dirname(target)), true)) return false;
+  const c = config(root);
+  const text = fs.readFileSync(path.join(PLUGIN_ROOT, 'templates', DEFAULT_DOCS[part]), 'utf8')
+    .replaceAll('{{name}}', c.name || path.basename(root)).replaceAll('{{date}}', now().slice(0, 10));
+  if (over) { writeText(target, text); return true; }
+  try { fs.writeFileSync(target, text, { flag: 'wx' }); return true; } catch (e) { if (e.code !== 'EEXIST') throw e; return false; }
+}
+// What the agent is to ask the user about the documents found: at init, and at every session start until the user chose.
+function pendingText(root, c, parts) {
+  const node = nodeCommand();
+  return [
+    `Before other work, tell the user that Driftless found documents already in ${root} and works with them as they are, ` +
+      `rewriting nothing: ${parts.map((k) => `${c.docs[k]} as ${DOC_ROLES[k].words}`).join('; ')}. Read each one, say in a line what it holds, ` +
+      `then ask the user${adapter().askWith || ''}, for each, whether to KEEP it (Driftless works with it as it is) or have Driftless REWRITE it ` +
+      'from scratch with its own template (the old text is saved first in .driftless/replaced/, which git does not see). Then run, for each one:',
+    `- keep: ${node} docs "${root}" keep <part> "<file>"`,
+    `- rewrite: ${node} docs "${root}" rewrite <part> "<file>"`,
+    `- if the file is not that kind of document at all: ${node} docs "${root}" new <part> (Driftless creates its own and leaves the file alone)`,
+    `<part> is goal, design or log. A rewritten goal is empty: interview the user for it.`,
+  ].join('\n');
+}
+
 // ---------- commands ----------
 function init(folder) {
   const root = path.resolve(folder);
   fs.mkdirSync(root, { recursive: true });
   const name = path.basename(root);
-  if (!fs.existsSync(dl(root, 'config.json'))) writeJson(dl(root, 'config.json'), { name, docs: DEFAULT_DOCS, created: now() });
+  // A folder that is not a project yet: whatever plays a part there is the user's to judge. A project already: the
+  // documents its config names, where they are, have been chosen.
+  const fresh = !fs.existsSync(dl(root, 'config.json'));
+  if (fresh) writeJson(dl(root, 'config.json'), { name, docs: DEFAULT_DOCS, created: now() });
   const c = config(root);
-  const date = now().slice(0, 10);
-  const real = fs.realpathSync(root);
-  for (const [key, file] of Object.entries(c.docs)) {
-    const target = path.join(root, file);
-    // Written inside the project only: not into a folder that is a link out of it, nor through a link that leads nowhere,
-    // as a clone can bring either. A name that is there, a link included, is left as it is: lstat sees a link that leads
-    // nowhere, where existsSync follows it and finds nothing. "wx" alone is not enough: on Windows it creates the file
-    // a dangling link leads to (seen on GitHub's runner, where links can be made).
-    if (taken(target) || !within(real, fs.realpathSync(path.dirname(target)), true)) continue;
-    const tpl = fs.readFileSync(path.join(PLUGIN_ROOT, 'templates', DEFAULT_DOCS[key]), 'utf8');
-    try { fs.writeFileSync(target, tpl.replaceAll('{{name}}', name).replaceAll('{{date}}', date), { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
+  const chosen = Object.fromEntries(Object.entries(c.docs).filter(([, f]) => !fresh && taken(path.join(root, f))));
+  const free = Object.keys(DEFAULT_DOCS).filter((k) => !chosen[k]);
+  const found = free.length && !c.broken ? findDocs(root, free, Object.values(chosen).map(relName)) : {};
+  const created = free.filter((k) => !found[k] && writeTemplate(root, k, c.docs[k])).map((k) => c.docs[k]);
+  if (Object.keys(found).length) {
+    setConfig(root, { docs: { ...c.docs, ...Object.fromEntries(Object.entries(found).map(([k, f]) => [k, f.rel])) },
+      pending_docs: Object.keys(DEFAULT_DOCS).filter((k) => found[k] || pendingDocs(c).includes(k)) });
   }
   if (!fs.existsSync(dl(root, 'baton.json'))) writeJson(dl(root, 'baton.json'), { state: 'RELEASED', history: [`${now()} created`] });
   register(root);
-  console.log(`Driftless project ready in ${root}: ${Object.values(c.docs).join(', ')}.`);
+  const after = config(root);
+  console.log(`Driftless project ready in ${root}: ${Object.values(after.docs).join(', ')}.`);
+  if (Object.keys(found).length) {
+    console.log([
+      created.length ? `Created from Driftless' templates: ${created.join(', ')}.` : 'Nothing created: every part already had a document.',
+      'Already in the folder, and left as they are:',
+      ...Object.entries(found).map(([k, f]) => `- ${DOC_ROLES[k].words} (${k}): ${docSummary(root, f.rel)}, found by ${f.why}.` +
+        (f.others.length ? ` Also looks like one: ${f.others.slice(0, 4).join(', ')}.` : '')),
+      pendingText(root, after, Object.keys(found)),
+      'Ask this before the goal interview: a goal document kept needs no interview, only the user\'s confirmation that it still says what they want.',
+    ].join('\n'));
+  }
+  const cap = explicitCap(root);
+  console.log(`Cap: ${capWords(root)}. To choose one: ${nodeCommand()} cap ${CAP_CHOICES.map((n) => `${n / 1000}k`).join('|')} "${root}".`);
   if (!can('trustList')) console.log('The fresh session may ask once to trust this new folder.');
   else if (!trustedBy(root)) console.log(
     `Not trusted yet: the fresh session will ask once to trust ${root}. Trust lasts for subfolders, so trusting ` +
     `the folder that holds your projects once (run claude there and accept) lets every new project start without asking.`);
+}
+
+// The documents of the project, and the user's answer about those init found: keep one as it is, have it rewritten from
+// scratch with the template (a copy of the old text first, in .driftless/replaced/), or leave it alone and use a new one.
+function docsCmd(folder, action, part, file) {
+  const root = findProject(path.resolve(folder || process.cwd()));
+  if (!root) { console.log(`Not a Driftless project: ${folder || process.cwd()}. Run init first: it looks at the documents already there.`); process.exitCode = 1; return; }
+  const c = config(root);
+  const fail = (text) => { console.log(text); process.exitCode = 1; };
+  if (c.broken) return fail(`${dl(root, 'config.json')} does not read as JSON: Driftless does not write to it until it is fixed.`);
+  const pend = pendingDocs(c);
+  if (!action) {
+    const others = findDocs(root, Object.keys(DEFAULT_DOCS), Object.values(c.docs).map(relName));
+    return console.log([
+      `Documents of ${root}:`,
+      ...Object.keys(DEFAULT_DOCS).map((k) => `- ${k}: ${taken(path.join(root, c.docs[k])) ? docSummary(root, c.docs[k]) : `${c.docs[k]} (missing)`}` +
+        (pend.includes(k) ? ' — found by init, the user has not chosen yet' : '')),
+      ...(Object.keys(others).length ? [`Other files that look like one: ${Object.values(others).map((f) => `${f.rel} (${f.part})`).join(', ')}.`] : []),
+      ...(pend.length ? [pendingText(root, c, pend)] : []),
+    ].join('\n'));
+  }
+  if (!['keep', 'rewrite', 'new'].includes(action) || !Object.hasOwn(DEFAULT_DOCS, part || '')) {
+    return fail(`Use: docs "<folder>" keep|rewrite <part> "<file>", or docs "<folder>" new <part>; <part> is goal, design or log.`);
+  }
+  const rel = action === 'new' ? DEFAULT_DOCS[part] : docName(root, file || c.docs[part]);
+  if (!rel) return fail(`${file} is not a file name inside ${root}.`);
+  const other = Object.entries(c.docs).find(([k, f]) => k !== part && relName(f) === relName(rel));
+  if (other && action !== 'new') return fail(`${rel} is already ${DOC_ROLES[other[0]].words} (${other[0]}): one file plays one part.`);
+  const done = (text) => {
+    setConfig(root, { docs: { ...c.docs, [part]: relName(rel) }, pending_docs: pend.filter((k) => k !== part).length ? pend.filter((k) => k !== part) : undefined });
+    console.log(text);
+  };
+  if (action === 'keep') {
+    if (!plainFileIn(root, rel)) return fail(`${rel} is not a file of ${root} (a link is not used).`);
+    return done(`Driftless keeps ${rel} as ${DOC_ROLES[part].words}, as it is: nothing in it was rewritten.`);
+  }
+  if (action === 'new') {
+    if (other) return fail(`${rel} is already ${DOC_ROLES[other[0]].words} (${other[0]}).`);
+    if (taken(path.join(root, rel))) return fail(`${rel} is already there: keep it or rewrite it (docs "${root}" keep|rewrite ${part} "${rel}").`);
+    if (!writeTemplate(root, part, rel)) return fail(`Driftless could not write ${rel} in ${root}.`);
+    return done(`Driftless created ${rel} as ${DOC_ROLES[part].words}${c.docs[part] !== rel ? `; ${c.docs[part]} stays as it is and is no longer one of its documents` : ''}.` +
+      (part === 'goal' ? ' Interview the user for the goal.' : ''));
+  }
+  const abs = plainFileIn(root, rel);
+  if (!abs) return fail(`${rel} is not a file of ${root} (a link is not rewritten).`);
+  const copy = dl(root, 'replaced', `${now().replace(/[:.]/g, '-')}-${path.basename(rel)}`);
+  fs.mkdirSync(path.dirname(copy), { recursive: true });
+  fs.copyFileSync(abs, copy);
+  if (!writeTemplate(root, part, rel, { over: true })) return fail(`Driftless could not rewrite ${rel}; it is as it was.`);
+  done(`Driftless rewrote ${rel} from scratch as ${DOC_ROLES[part].words}; the old text is in ${copy}.` +
+    (part === 'goal' ? ' Interview the user for the goal: the document is empty.' : ''));
+}
+
+// Where the handoff comes, in words: the cap the user chose, or the economic rule.
+function capWords(root) {
+  const cap = explicitCap(root);
+  if (!cap) return `automatic: a handoff when carrying the context costs more than a fresh start, by ${DEFAULTS.guard_ask.toLocaleString('en')} tokens at the latest`;
+  const c = config(root);
+  const pct = capPercent(c);
+  const set = Number(c.token_cap) > 0 ? Number(c.token_cap) : settingCap();
+  const from = [set && `${Number(c.token_cap) > 0 ? 'token_cap in .driftless/config.json' : 'the plugin\'s setting'}`, pct && `${pct}% of the context window`].filter(Boolean);
+  const clamped = cap === MAX_TOKEN_CAP && (set > MAX_TOKEN_CAP || (pct && Math.round(contextWindow(root) * pct / 100) > MAX_TOKEN_CAP));
+  return `${cap.toLocaleString('en')} tokens (${from.join(' and ')}${from.length > 1 ? ', the lower' : ''}` +
+    `${clamped ? `; ${MAX_TOKEN_CAP.toLocaleString('en')} is the most` : ''})`;
+}
+// The user picks the cap: one of CAP_CHOICES, or "auto" for the economic rule. It replaces a percentage, if there was one:
+// with both, the lower would win, and the choice would not be the one in force.
+function capCmd(value, folder) {
+  const isValue = /^(\d+([.,]\d+)?\s*k?|auto|off|none)$/i.test(String(value || '').trim());
+  const at = path.resolve((isValue ? folder : value) || process.cwd());
+  const root = findProject(at);
+  if (!root) { console.log(`Not a Driftless project: ${at}.`); process.exitCode = 1; return; }
+  const choices = CAP_CHOICES.map((n) => `cap ${n / 1000}k`).join(' · ');
+  if (!isValue) return console.log(`Cap in ${root}: ${capWords(root)}.\nChoices: ${choices} (the most Driftless allows), or cap auto.`);
+  if (config(root).broken) { console.log(`${dl(root, 'config.json')} does not read as JSON: Driftless does not write to it until it is fixed.`); process.exitCode = 1; return; }
+  const v = String(value).trim().toLowerCase().replace(',', '.');
+  const n = /^(auto|off|none)$/.test(v) ? 0 : Math.round(parseFloat(v) * (/k$/.test(v) || parseFloat(v) < 1000 ? 1000 : 1));
+  if (n && !CAP_CHOICES.includes(n)) {
+    console.log(`${n.toLocaleString('en')} is not one of the caps: ${choices}${n > MAX_TOKEN_CAP ? `; ${MAX_TOKEN_CAP.toLocaleString('en')} is the most` : ''}, or cap auto.`);
+    process.exitCode = 1; return;
+  }
+  const pct = capPercent(config(root));
+  setConfig(root, { token_cap: n || undefined, cap_percent: undefined });
+  console.log(`Cap in ${root}: ${capWords(root)}${pct ? `; it replaces the ${pct}% cap` : ''}. From the next answer.` +
+    (!n && settingCap() ? ` The plugin's own setting (${settingCap().toLocaleString('en')} tokens) still applies: change it in /plugin.` : ''));
 }
 
 // Claude Code asks once whether to trust a folder it has not seen; outside git, trusting a folder covers its
@@ -3747,6 +3964,8 @@ if (isMain) try {
   else if (cmd === 'pre-compact') preCompact(hookInput('pre-compact'));
   else if (cmd === 'user-prompt-submit') userPromptSubmit(hookInput('user-prompt-submit'));
   else if (cmd === 'init') init(arg);
+  else if (cmd === 'docs') docsCmd(arg, arg2, arg3, ARGV[4]);
+  else if (cmd === 'cap') capCmd(arg, arg2);
   else if (cmd === 'open') open(arg, arg2);
   else if (cmd === 'desktop-open') desktopOpen(arg, arg2, arg3);
   else if (cmd === 'vscode-open') vscodeOpen(arg, arg2, arg3);

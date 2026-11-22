@@ -36,9 +36,12 @@ A well-chosen fixed cap is statistically as good: the point is not having to cho
 
 | Option | Example | Meaning |
 |---|---|---|
-| `token_cap` | `250000` | Hand off at this many tokens. |
+| `token_cap` | `340000` | Hand off at this many tokens. |
 | `cap_percent` | `34` | Hand off at this share of the model's context window. |
-| both | `34` + `250000` | The lower of the two wins: the token cap is an absolute ceiling. |
+| both | `34` + `340000` | The lower of the two wins: the token cap is an absolute ceiling. |
+
+Or just ask the agent for a cap: it offers **260k, 340k or 400k** and runs `cap 340k` (`cap auto` goes back to the rule).
+No cap goes past **400,000 tokens**, whatever a config or a percentage of a 1M window says.
 
 **In the middle of a turn, too (Claude Code).** The end of a turn is the natural moment to hand off, but one turn can grow
 by hundreds of thousands of tokens. So after every tool step a hook compares the context with the 260,000 above, or with your
